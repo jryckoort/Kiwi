@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="mb-6 grid gap-4 sm:grid-cols-3">
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Actifs</p>
+    <p class="mt-1 text-2xl font-semibold">{{ total_assets }}</p>
+  </div>
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Dettes</p>
+    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities }}</p>
+  </div>
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Patrimoine net</p>
+    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth }}</p>
+  </div>
+</div>
+
+<div class="mb-6 grid gap-6 lg:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-3 font-semibold">Revenus / dépenses (6 derniers mois)</h2>
+    <canvas id="cashflowChart" height="220"></canvas>
+  </div>
+  <div class="card">
+    <h2 class="mb-3 font-semibold">Évolution du patrimoine net</h2>
+    <canvas id="netWorthChart" height="220"></canvas>
+  </div>
+</div>
+
+<div class="mb-6 grid gap-6 lg:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-3 font-semibold">Répartition des actifs</h2>
+    <canvas id="allocationChart" height="220"></canvas>
+  </div>
+  <div class="card overflow-x-auto p-0">
+    <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">Transactions récentes</p>
+    <table class="w-full text-sm">
+      <tbody>
+        {% for tx in recent_transactions %}
+        <tr class="border-t border-stone-100">
+          <td class="px-4 py-2 text-xs text-stone-500">{{ tx.date }}</td>
+          <td class="px-4 py-2">{{ tx.description|default:tx.counterparty|default:tx.account.name }}</td>
+          <td class="px-4 py-2 text-right {% if tx.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">{{ tx.amount }}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="px-4 py-6 text-center text-stone-500">Aucune transaction.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const cashflowCtx = document.getElementById("cashflowChart");
+  new Chart(cashflowCtx, {
+    type: "bar",
+    data: {
+      labels: {{ monthly_labels|safe }},
+      datasets: [
+        { label: "Revenus", data: {{ monthly_income|safe }}, backgroundColor: "#10b981" },
+        { label: "Dépenses", data: {{ monthly_expense|safe }}, backgroundColor: "#ef4444" },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+  });
+
+  const netWorthCtx = document.getElementById("netWorthChart");
+  new Chart(netWorthCtx, {
+    type: "line",
+    data: {
+      labels: {{ net_worth_history_labels|safe }},
+      datasets: [
+        { label: "Patrimoine net", data: {{ net_worth_history_values|safe }}, borderColor: "#059669", tension: 0.3, fill: false },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } },
+  });
+
+  const allocationCtx = document.getElementById("allocationChart");
+  new Chart(allocationCtx, {
+    type: "doughnut",
+    data: {
+      labels: {{ allocation_labels|safe }},
+      datasets: [
+        { data: {{ allocation_values|safe }}, backgroundColor: ["#10b981","#059669","#34d399","#6ee7b7","#a7f3d0","#f59e0b","#fbbf24"] },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+  });
+});
+</script>
+{% endblock %}

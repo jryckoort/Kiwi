@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Inscription{% endblock %}
+{% block guest_content %}
+<div class="card w-full max-w-sm">
+  <div class="mb-6 text-center text-2xl font-semibold text-emerald-700">🥝 Kiwi</div>
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% for field in form %}
+    <div>
+      <label class="mb-1 block text-sm font-medium text-stone-700">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}
+      <p class="mt-1 text-xs text-red-600">{{ error }}</p>
+      {% endfor %}
+      {% if field.help_text %}<p class="mt-1 text-xs text-stone-500">{{ field.help_text }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn-primary w-full">Créer mon compte</button>
+  </form>
+  <p class="mt-4 text-center text-sm text-stone-600">
+    Déjà un compte ? <a href="{% url 'accounts:login' %}" class="text-emerald-700 underline">Connectez-vous</a>
+  </p>
+</div>
+{% endblock %}

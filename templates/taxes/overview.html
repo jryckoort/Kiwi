@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Fiscalité{% endblock %}
+{% block page_title %}Fiscalité{% endblock %}
+{% block content %}
+{% include "partials/_tax_disclaimer.html" %}
+
+<div class="mb-6 grid gap-4 sm:grid-cols-3">
+  <a href="{% url 'taxes:plus_value_calculator' %}" class="card block hover:border-emerald-300">
+    <p class="font-semibold">Taxe sur la plus-value</p>
+    <p class="mt-1 text-xs text-stone-500">Simulateur 10% sur plus-values mobilières (dès 2026)</p>
+  </a>
+  <a href="{% url 'taxes:tob_calculator' %}" class="card block hover:border-emerald-300">
+    <p class="font-semibold">TOB</p>
+    <p class="mt-1 text-xs text-stone-500">Taxe sur les opérations de bourse</p>
+  </a>
+  <a href="{% url 'taxes:precompte_calculator' %}" class="card block hover:border-emerald-300">
+    <p class="font-semibold">Précompte mobilier</p>
+    <p class="mt-1 text-xs text-stone-500">Retenue sur dividendes / intérêts</p>
+  </a>
+</div>
+
+{% if annual_summary %}
+<div class="card mb-6">
+  <h2 class="mb-3 font-semibold">Plus-values réalisées en {{ current_year }} (foyer)</h2>
+  <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+    <div><dt class="text-stone-500">Gain total</dt><dd class="font-medium">{{ annual_summary.total_gain }}</dd></div>
+    <div><dt class="text-stone-500">Exonération</dt><dd class="font-medium">{{ annual_summary.exemption }}</dd></div>
+    <div><dt class="text-stone-500">Base imposable</dt><dd class="font-medium">{{ annual_summary.taxable }}</dd></div>
+    <div><dt class="text-stone-500">Impôt estimé</dt><dd class="font-medium text-emerald-700">{{ annual_summary.tax_due }}</dd></div>
+  </dl>
+</div>
+{% endif %}
+
+<div class="card overflow-x-auto p-0">
+  <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">Ventes récentes</p>
+  <table class="w-full text-sm">
+    <thead class="text-left text-xs uppercase text-stone-500">
+      <tr>
+        <th class="px-4 py-2">Date</th>
+        <th class="px-4 py-2">Titre</th>
+        <th class="px-4 py-2 text-right">Produit</th>
+        <th class="px-4 py-2 text-right">Base coût</th>
+        <th class="px-4 py-2 text-right">Plus-value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for gain in recent_gains %}
+      <tr class="border-t border-stone-100">
+        <td class="px-4 py-2">{{ gain.security_transaction.date }}</td>
+        <td class="px-4 py-2">{{ gain.security_transaction.security.name }}</td>
+        <td class="px-4 py-2 text-right">{{ gain.proceeds }}</td>
+        <td class="px-4 py-2 text-right">{{ gain.cost_basis }}</td>
+        <td class="px-4 py-2 text-right {% if gain.realized_gain < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">{{ gain.realized_gain }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="px-4 py-6 text-center text-stone-500">Aucune vente enregistrée.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

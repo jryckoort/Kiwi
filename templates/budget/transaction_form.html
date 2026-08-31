@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Transaction{% endblock %}
+{% block page_title %}{% if transaction %}Modifier la transaction{% else %}Nouvelle transaction{% endif %}{% endblock %}
+{% block content %}
+<div class="card max-w-lg">
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+      <label class="mb-1 block text-sm font-medium text-stone-700">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}
+      <p class="mt-1 text-xs text-red-600">{{ error }}</p>
+      {% endfor %}
+      {% if field.help_text %}<p class="mt-1 text-xs text-stone-500">{{ field.help_text }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn-primary w-full">Enregistrer</button>
+  </form>
+</div>
+{% endblock %}

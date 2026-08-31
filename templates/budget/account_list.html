@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Budget{% endblock %}
+{% block page_title %}Comptes{% endblock %}
+{% block content %}
+<div class="mb-4 flex justify-end gap-2">
+  <a href="{% url 'budget:category_list' %}" class="btn-secondary">Catégories</a>
+  <a href="{% url 'budget:account_create' %}" class="btn-primary">+ Nouveau compte</a>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {% for account in accounts %}
+  <a href="{% url 'budget:account_detail' account.pk %}" class="card block hover:border-emerald-300">
+    <div class="flex items-center justify-between">
+      <span class="font-semibold">{{ account.name }}</span>
+      <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+        {% if account.is_joint %}Commun{% else %}{{ account.owner.get_short_name }}{% endif %}
+      </span>
+    </div>
+    <p class="mt-1 text-xs text-stone-500">{{ account.get_type_display }} · {{ account.institution }}</p>
+    <p class="mt-3 text-xl font-semibold {% if account.balance < 0 %}text-red-600{% else %}text-stone-900{% endif %}">
+      {{ account.balance|default:0 }} {{ account.currency_id }}
+    </p>
+  </a>
+  {% empty %}
+  <p class="text-sm text-stone-500">Aucun compte pour l'instant.</p>
+  {% endfor %}
+</div>
+{% endblock %}

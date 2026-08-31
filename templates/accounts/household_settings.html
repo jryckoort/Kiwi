@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Paramètres du foyer{% endblock %}
+{% block page_title %}Paramètres — {{ household.name }}{% endblock %}
+{% block content %}
+<div class="grid gap-6 md:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Membres</h2>
+    <ul class="space-y-2 text-sm">
+      {% for membership in memberships %}
+      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
+        <span>{{ membership.user.get_full_name|default:membership.user.email }}</span>
+        <span class="text-xs text-stone-500">{{ membership.get_role_display }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if pending_invites %}
+    <h3 class="mb-2 mt-4 text-sm font-semibold text-stone-600">Invitations en attente</h3>
+    <ul class="space-y-1 text-sm text-stone-600">
+      {% for invite in pending_invites %}
+      <li>{{ invite.email }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+  {% if is_admin %}
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Inviter un membre</h2>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {% for field in invite_form %}
+      <div>
+        <label class="mb-1 block text-sm font-medium text-stone-700">{{ field.label }}</label>
+        {{ field }}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn-primary w-full">Envoyer l'invitation</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Devise de référence</h2>
+    <p class="text-sm text-stone-600">{{ household.base_currency }}</p>
+  </div>
+</div>
+{% endblock %}

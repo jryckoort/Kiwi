@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}TOB{% endblock %}
+{% block page_title %}Taxe sur les opérations de bourse{% endblock %}
+{% block content %}
+{% include "partials/_tax_disclaimer.html" %}
+<div class="grid gap-6 md:grid-cols-2">
+  <div class="card">
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {% for field in form %}
+      <div>
+        <label class="mb-1 block text-sm font-medium text-stone-700">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn-primary w-full">Calculer</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2 class="mb-3 font-semibold">Résultat</h2>
+    {% if result %}
+    <dl class="space-y-2 text-sm">
+      <div class="flex justify-between"><dt class="text-stone-500">Taux</dt><dd class="font-medium">{{ result.rate_percent }}%</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Plafond</dt><dd class="font-medium">{{ result.cap_amount }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">TOB brute</dt><dd class="font-medium">{{ result.raw_tax }}</dd></div>
+      <div class="flex justify-between border-t border-stone-200 pt-2"><dt class="font-semibold">TOB due</dt><dd class="font-semibold text-emerald-700">{{ result.tax_due }}</dd></div>
+      {% if result.capped %}<p class="text-xs text-amber-700">Plafonnée au montant maximum.</p>{% endif %}
+    </dl>
+    {% else %}
+    <p class="text-sm text-stone-500">Renseignez le formulaire pour voir l'estimation.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
