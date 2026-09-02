@@ -2,6 +2,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
+from apps.fx.services import to_base_currency
+
 from .models import Liability, NetWorthSnapshot, RealAsset, Security, SecurityTransaction
 
 
@@ -86,24 +88,6 @@ def _consume_fifo(lots, quantity):
     return cost_removed
 
 
-def _to_base_currency(amount, currency_code, base_currency, label, warnings):
-    """Convert into the household's base currency, degrading gracefully.
-
-    A missing exchange rate must never silently distort the total: the raw
-    amount is still counted, but the item is recorded in ``warnings`` so the
-    UI can say the figure mixes currencies.
-    """
-    from apps.fx.services import ExchangeRateUnavailable, convert
-
-    if currency_code == base_currency:
-        return amount
-    try:
-        return convert(amount, currency_code, base_currency)
-    except ExchangeRateUnavailable:
-        warnings.append(f"{label} : montant en {currency_code} non converti (taux indisponible)")
-        return amount
-
-
 def compute_net_worth(household):
     """Net worth in the household's base currency.
 
@@ -130,7 +114,7 @@ def compute_net_worth(household):
     accounts = FinancialAccount.objects.for_household(household).filter(is_archived=False)
     for account in accounts:
         balance = account.transactions.aggregate(total=Sum("amount"))["total"] or Decimal(0)
-        balance = _to_base_currency(
+        balance = to_base_currency(
             balance, account.currency_id, base_currency, account.name, warnings
         )
         total_assets += balance
@@ -146,14 +130,14 @@ def compute_net_worth(household):
                 warnings.append(f"{security.name} : aucun cours connu, valorisé au prix de revient")
             else:
                 value = price * holding.quantity
-            value = _to_base_currency(
+            value = to_base_currency(
                 value, security.currency_id, base_currency, security.name, warnings
             )
             total_assets += value
             breakdown["securities"][f"{account.name} · {security.name}"] = str(value)
 
     for asset in RealAsset.objects.for_household(household):
-        value = _to_base_currency(
+        value = to_base_currency(
             asset.current_value, asset.currency_id, base_currency, asset.name, warnings
         )
         total_assets += value
@@ -161,7 +145,7 @@ def compute_net_worth(household):
 
     total_liabilities = Decimal(0)
     for liability in Liability.objects.for_household(household):
-        value = _to_base_currency(
+        value = to_base_currency(
             liability.remaining_balance,
             liability.currency_id,
             base_currency,

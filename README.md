@@ -22,7 +22,7 @@ fiscaux belges (TOB, précompte mobilier, taxe sur la plus-value).
 | App | Rôle |
 |---|---|
 | `accounts` | Utilisateurs, foyers, adhésions, invitations, isolation multi-foyers |
-| `budget` | Comptes financiers, catégories, transactions |
+| `budget` | Comptes financiers, catégories, transactions, budgets prévisionnels, récurrences |
 | `wealth` | Titres, opérations sur titres (FIFO), actifs réels, dettes, patrimoine net |
 | `fx` | Devises et taux de change |
 | `taxes` | Calculateurs fiscaux belges (TOB, précompte mobilier, plus-value) |
@@ -91,6 +91,27 @@ seuils (TOB, précompte mobilier, taxe sur la plus-value entrée en vigueur en
 toujours les valeurs en vigueur auprès du SPF Finances avant de vous y fier
 pour une déclaration réelle.
 
+## Budgets et transactions récurrentes
+
+Les **budgets** se définissent par catégorie, par mois et par personne — chaque
+membre a ses propres enveloppes, plus un budget « commun » (`owner = NULL`).
+
+Les dépenses réelles sont rattachées à une personne **via le compte utilisé** :
+une dépense sur un compte perso compte pour son propriétaire, une dépense sur
+un compte joint compte pour le commun. Il n'y a donc rien à taguer à la saisie
+ni à l'import.
+
+Les **transactions récurrentes** (loyer, salaire, abonnements) sont
+volontairement **prévisionnelles uniquement** : elles ne créent jamais de
+transaction. Vos mouvements réels viennent de l'import bancaire ou de la
+saisie manuelle — matérialiser les récurrences en plus doublonnerait chaque
+loyer et chaque salaire. Elles alimentent la colonne « attendu » des budgets
+et la liste des échéances à venir.
+
+Les échéances sont calculées comme `date de début + n × période` plutôt qu'en
+avançant de proche en proche : un loyer au 31 retombe au 28 en février puis
+**revient** au 31, au lieu de dériver définitivement.
+
 ## Calcul du patrimoine net
 
 Le patrimoine net additionne les soldes des comptes, la valeur de marché des
@@ -120,7 +141,6 @@ précède.
 
 ## Suites prévues (hors périmètre de cette première version)
 
-- Transactions récurrentes / budgets prévisionnels
 - Récupération automatique des cours de bourse
 - Connexion OAuth (Google)
 - Répartition de l'exonération de plus-value par personne (actuellement

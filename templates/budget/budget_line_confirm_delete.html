@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Supprimer la ligne de budget{% endblock %}
+{% block page_title %}Supprimer la ligne de budget{% endblock %}
+{% block content %}
+<div class="card max-w-md">
+  <p class="mb-4 text-sm text-stone-700">
+    Supprimer le budget « {{ line.category.name }} » de {{ line.month|date:"F Y" }}
+    ({% if line.owner %}{{ line.owner.get_short_name }}{% else %}commun{% endif %},
+    {{ line.planned_amount|floatformat:2 }}) ?
+  </p>
+  <form method="post" class="flex gap-2">
+    {% csrf_token %}
+    <button type="submit" class="btn-primary bg-red-600 hover:bg-red-700">Supprimer</button>
+    <a href="{% url 'budget:budget_overview' %}?mois={{ line.month|date:'Y-m' }}" class="btn-secondary">Annuler</a>
+  </form>
+</div>
+{% endblock %}

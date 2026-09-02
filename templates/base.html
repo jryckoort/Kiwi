@@ -32,6 +32,8 @@
     <nav class="flex-1 space-y-1 px-3 py-4 text-sm">
       <a href="{% url 'dashboard:home' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100">Tableau de bord</a>
       <a href="{% url 'budget:account_list' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100">Budget</a>
+      <a href="{% url 'budget:budget_overview' %}" class="block rounded-md px-3 py-2 pl-6 text-stone-600 hover:bg-stone-100">Budgets prévisionnels</a>
+      <a href="{% url 'budget:recurring_list' %}" class="block rounded-md px-3 py-2 pl-6 text-stone-600 hover:bg-stone-100">Récurrentes</a>
       <a href="{% url 'wealth:overview' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100">Patrimoine</a>
       <a href="{% url 'taxes:overview' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100">Fiscalité</a>
       <a href="{% url 'imports_app:upload' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100">Imports</a>

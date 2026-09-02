@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Récurrentes{% endblock %}
+{% block page_title %}Transactions récurrentes{% endblock %}
+{% block content %}
+
+<div class="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+  Les récurrences servent au <strong>prévisionnel</strong> : elles alimentent les budgets et les
+  échéances à venir, mais ne créent jamais de transaction. Vos mouvements réels viennent de
+  l'import bancaire ou de la saisie manuelle — pas de doublon possible.
+</div>
+
+<div class="mb-4 flex justify-end">
+  <a href="{% url 'budget:recurring_create' %}" class="btn-primary">+ Nouvelle récurrence</a>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="card overflow-x-auto p-0">
+    <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">Récurrences déclarées</p>
+    <table class="w-full text-sm">
+      <thead class="text-left text-xs uppercase text-stone-500">
+        <tr>
+          <th class="px-4 py-2">Libellé</th>
+          <th class="px-4 py-2">Rattachée à</th>
+          <th class="px-4 py-2">Fréquence</th>
+          <th class="px-4 py-2 text-right">Montant</th>
+          <th class="px-4 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for recurrence in recurrences %}
+        <tr class="border-t border-stone-100 {% if not recurrence.is_active %}opacity-50{% endif %}">
+          <td class="px-4 py-2">
+            {{ recurrence.description }}
+            {% if not recurrence.is_active %}<span class="ml-1 text-xs text-stone-500">(inactive)</span>{% endif %}
+            {% if recurrence.category %}
+            <span class="ml-1 text-xs text-stone-500">· {{ recurrence.category.name }}</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-xs">
+            {% if recurrence.owner %}{{ recurrence.owner.get_short_name }}{% else %}Commun{% endif %}
+            <span class="text-stone-400">({{ recurrence.account.name }})</span>
+          </td>
+          <td class="px-4 py-2 text-xs">
+            {{ recurrence.get_frequency_display }}{% if recurrence.interval > 1 %} ×{{ recurrence.interval }}{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right {% if recurrence.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
+            {{ recurrence.amount|floatformat:2 }} {{ recurrence.currency_id }}
+          </td>
+          <td class="px-4 py-2 text-right text-xs">
+            <a href="{% url 'budget:recurring_edit' recurrence.pk %}" class="text-stone-500 hover:underline">Modifier</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-4 py-6 text-center text-stone-500">Aucune récurrence déclarée.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card overflow-x-auto p-0">
+    <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">
+      Échéances à venir (jusqu'au {{ horizon_end|date:"d/m/Y" }})
+    </p>
+    <table class="w-full text-sm">
+      <tbody>
+        {% for item in upcoming %}
+        <tr class="border-t border-stone-100">
+          <td class="px-4 py-2 text-xs text-stone-500">{{ item.date|date:"d/m/Y" }}</td>
+          <td class="px-4 py-2">{{ item.recurrence.description }}</td>
+          <td class="px-4 py-2 text-xs text-stone-500">
+            {% if item.recurrence.owner %}{{ item.recurrence.owner.get_short_name }}{% else %}Commun{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right {% if item.recurrence.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
+            {{ item.recurrence.amount|floatformat:2 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td class="px-4 py-6 text-center text-stone-500">Aucune échéance sur les 3 prochains mois.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

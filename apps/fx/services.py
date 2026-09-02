@@ -46,3 +46,19 @@ def convert(amount: Decimal, from_code: str, to_code: str, on_date=None) -> Deci
     raise ExchangeRateUnavailable(
         f"Aucun taux de change {from_code}->{to_code} disponible au {on_date}"
     )
+
+
+def to_base_currency(amount, currency_code, base_currency, label, warnings, on_date=None):
+    """Convert into a household's base currency, degrading gracefully.
+
+    A missing rate must never silently distort a total: the raw amount is
+    still returned, but ``label`` is appended to ``warnings`` so the caller
+    can tell the user the figure mixes currencies.
+    """
+    if currency_code == base_currency:
+        return amount
+    try:
+        return convert(amount, currency_code, base_currency, on_date=on_date)
+    except ExchangeRateUnavailable:
+        warnings.append(f"{label} : montant en {currency_code} non converti (taux indisponible)")
+        return amount

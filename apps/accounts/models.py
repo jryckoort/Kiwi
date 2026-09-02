@@ -40,6 +40,7 @@ class PersonallyOwnedModel(HouseholdOwnedModel):
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        verbose_name="propriétaire",
         null=True,
         blank=True,
         # PROTECT, not SET_NULL: owner=None means "commun au foyer", so
