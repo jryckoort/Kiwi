@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Household, HouseholdInvite, HouseholdMembership, User
+from .models import Household, HouseholdInvite, HouseholdMembership, MagicLoginToken, User
 
 
 @admin.register(User)
@@ -44,3 +44,13 @@ class HouseholdAdmin(admin.ModelAdmin):
 class HouseholdInviteAdmin(admin.ModelAdmin):
     list_display = ("email", "household", "invited_by", "created_at", "accepted_at")
     list_filter = ("household",)
+
+
+@admin.register(MagicLoginToken)
+class MagicLoginTokenAdmin(admin.ModelAdmin):
+    list_display = ("user", "created_at", "used_at")
+    list_filter = ("user",)
+    readonly_fields = ("user", "token", "created_at", "used_at")
+
+    def has_add_permission(self, request):
+        return False

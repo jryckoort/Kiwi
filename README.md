@@ -70,6 +70,19 @@ docker compose exec web python manage.py createsuperuser
 Caddy obtient automatiquement un certificat HTTPS pour `SITE_DOMAIN` (mettez
 `localhost` pour un test local).
 
+## Connexion par lien magique (passwordless)
+
+En plus du login email/mot de passe classique, `/accounts/magic-login/`
+permet de recevoir un lien de connexion par email. Le lien est à usage
+unique et valable 15 minutes ; une fois cliqué, le navigateur reste connecté
+**90 jours glissants** (le délai est repoussé à chaque visite, donc tant que
+vous ouvrez l'app de temps en temps, vous ne vous reconnectez jamais).
+
+En dev, aucun email n'est réellement envoyé : le contenu (et donc le lien)
+s'affiche directement dans la console du serveur. En production, renseignez
+les variables `EMAIL_*` du `.env` avec n'importe quel fournisseur SMTP
+(Gmail SMTP, Resend, Mailgun, Postmark...).
+
 ## Fiscalité belge — avertissement
 
 Les calculateurs de `apps/taxes` sont fournis à titre indicatif. Les taux et

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Connexion par email{% endblock %}
+{% block guest_content %}
+<div class="card w-full max-w-sm">
+  <div class="mb-6 text-center text-2xl font-semibold text-emerald-700">🥝 Kiwi</div>
+  <p class="mb-4 text-sm text-stone-600">
+    Recevez un lien de connexion par email — pas de mot de passe à retenir.
+  </p>
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    <div>
+      <label class="mb-1 block text-sm font-medium text-stone-700">{{ form.email.label }}</label>
+      {{ form.email }}
+      {% for error in form.email.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+    </div>
+    <button type="submit" class="btn-primary w-full">Recevoir le lien</button>
+  </form>
+  <p class="mt-4 text-center text-sm text-stone-600">
+    <a href="{% url 'accounts:login' %}" class="text-emerald-700 underline">Se connecter avec un mot de passe</a>
+  </p>
+</div>
+{% endblock %}

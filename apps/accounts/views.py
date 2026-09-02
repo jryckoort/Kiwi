@@ -1,13 +1,17 @@
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import HouseholdCreateForm, HouseholdInviteForm, SignupForm
+from .forms import HouseholdCreateForm, HouseholdInviteForm, MagicLinkRequestForm, SignupForm
 from .middleware import ActiveHouseholdMiddleware
-from .models import HouseholdInvite, HouseholdMembership
+from .models import HouseholdInvite, HouseholdMembership, MagicLoginToken, User
 
 
 def signup(request):
@@ -121,4 +125,64 @@ def invite_accept(request, token):
 
     request.session[ActiveHouseholdMiddleware.SESSION_KEY] = invite.household_id
     messages.success(request, f"Vous avez rejoint le foyer « {invite.household.name} ».")
+    return redirect("dashboard:home")
+
+
+def magic_link_request(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard:home")
+
+    if request.method == "POST":
+        form = MagicLinkRequestForm(request.POST)
+        if form.is_valid():
+            _send_magic_link_if_eligible(request, form.cleaned_data["email"])
+            # Always show the same message, whether or not that email has an
+            # account — otherwise this endpoint would let anyone check which
+            # emails are registered.
+            return render(request, "accounts/magic_link_sent.html")
+    else:
+        form = MagicLinkRequestForm()
+
+    return render(request, "accounts/magic_link_request.html", {"form": form})
+
+
+def _send_magic_link_if_eligible(request, email):
+    user = User.objects.filter(email__iexact=email, is_active=True).first()
+    if user is None:
+        return
+
+    cooldown_start = timezone.now() - timedelta(minutes=1)
+    recent_token = user.magic_login_tokens.filter(created_at__gte=cooldown_start).exists()
+    if recent_token:
+        return
+
+    token = MagicLoginToken.objects.create(user=user)
+    link = request.build_absolute_uri(f"/accounts/magic-login/{token.token}/")
+    send_mail(
+        subject="Votre lien de connexion Kiwi",
+        message=(
+            f"Bonjour,\n\nCliquez sur ce lien pour vous connecter à Kiwi "
+            f"(valable {settings.MAGIC_LOGIN_TOKEN_EXPIRY_MINUTES} minutes) :\n\n{link}\n\n"
+            "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email."
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+    )
+
+
+def magic_link_consume(request, token):
+    magic_token = get_object_or_404(MagicLoginToken.objects.select_related("user"), token=token)
+
+    if not magic_token.is_valid:
+        messages.error(request, "Ce lien de connexion est invalide ou a expiré. Redemandez-en un.")
+        return redirect("accounts:magic_link_request")
+
+    magic_token.used_at = timezone.now()
+    magic_token.save(update_fields=["used_at"])
+
+    login(request, magic_token.user, backend="django.contrib.auth.backends.ModelBackend")
+    messages.success(request, "Connexion réussie.")
+
+    if not magic_token.user.memberships.exists():
+        return redirect("accounts:household_create")
     return redirect("dashboard:home")

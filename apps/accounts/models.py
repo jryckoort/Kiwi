@@ -1,4 +1,5 @@
 import secrets
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -175,3 +176,28 @@ class HouseholdInvite(models.Model):
     @property
     def is_accepted(self):
         return self.accepted_at is not None
+
+
+class MagicLoginToken(models.Model):
+    """A single-use, short-lived token emailed to log in without a password."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="magic_login_tokens")
+    token = models.CharField(max_length=64, unique=True, default=generate_invite_token)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "lien de connexion"
+        verbose_name_plural = "liens de connexion"
+
+    def __str__(self):
+        return f"Lien de connexion pour {self.user}"
+
+    @property
+    def is_expired(self):
+        expiry = timedelta(minutes=settings.MAGIC_LOGIN_TOKEN_EXPIRY_MINUTES)
+        return timezone.now() > self.created_at + expiry
+
+    @property
+    def is_valid(self):
+        return self.used_at is None and not self.is_expired

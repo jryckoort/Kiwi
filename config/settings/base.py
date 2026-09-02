@@ -88,6 +88,28 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "dashboard:home"
 LOGOUT_REDIRECT_URL = "accounts:login"
 
+# Once logged in (password or magic link), a browser stays signed in for 90
+# sliding days — SESSION_SAVE_EVERY_REQUEST pushes the expiry back out on
+# every visit, so a household member who opens the app at least once every
+# 90 days is never asked to log in again on that device.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Email — used to send magic login links. Any standard SMTP provider works
+# (Gmail SMTP, Resend, Mailgun, Postmark...); defaults to printing emails to
+# the console when unset, which is what dev.py forces regardless of .env.
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Kiwi <noreply@kiwi.local>")
+
+# How long a magic login link stays valid after being emailed.
+MAGIC_LOGIN_TOKEN_EXPIRY_MINUTES = 15
+
 LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = "Europe/Brussels"
 USE_I18N = True

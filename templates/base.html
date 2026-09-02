@@ -12,6 +12,19 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full text-stone-900">
+{% if messages %}
+<div class="mx-auto mt-4 max-w-2xl space-y-2 px-4">
+  {% for message in messages %}
+  <div class="rounded-md border px-4 py-2 text-sm
+    {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-700
+    {% elif message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700
+    {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-700
+    {% else %}border-sky-200 bg-sky-50 text-sky-700{% endif %}">
+    {{ message }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% if user.is_authenticated %}
 <div class="flex h-full">
   <aside class="hidden w-56 shrink-0 flex-col border-r border-stone-200 bg-white md:flex">
@@ -59,20 +72,6 @@
     </header>
 
     <main class="flex-1 overflow-y-auto p-6">
-      {% if messages %}
-      <div class="mb-4 space-y-2">
-        {% for message in messages %}
-        <div class="rounded-md border px-4 py-2 text-sm
-          {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-700
-          {% elif message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700
-          {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-700
-          {% else %}border-sky-200 bg-sky-50 text-sky-700{% endif %}">
-          {{ message }}
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
       {% if not active_household %}
       <div class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         Vous n'appartenez à aucun foyer pour l'instant.

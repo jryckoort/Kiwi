@@ -34,3 +34,10 @@ class HouseholdInviteForm(forms.ModelForm):
                 attrs={"class": "form-input", "placeholder": "email@exemple.com"}
             ),
         }
+
+
+class MagicLinkRequestForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"class": "form-input", "placeholder": "email@exemple.com"}),
+    )

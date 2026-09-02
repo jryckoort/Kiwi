@@ -21,6 +21,8 @@ urlpatterns = [
         name="household_switch",
     ),
     path("invites/<str:token>/", views.invite_accept, name="invite_accept"),
+    path("magic-login/", views.magic_link_request, name="magic_link_request"),
+    path("magic-login/<str:token>/", views.magic_link_consume, name="magic_link_consume"),
     path(
         "password-change/",
         auth_views.PasswordChangeView.as_view(
