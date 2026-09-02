@@ -18,18 +18,16 @@ from .forms import (
     TransactionForm,
 )
 from .models import BudgetLine, Category, FinancialAccount, RecurringTransaction, Transaction
+from .projections import project_household
 from .recurring import upcoming_occurrences
 
 
 @household_required
 def account_list(request):
-    accounts = (
-        FinancialAccount.objects.for_household(request.household)
-        .filter(is_archived=False)
-        .select_related("owner", "currency")
-        .annotate(balance=Sum("transactions__amount"))
-    )
-    return render(request, "budget/account_list.html", {"accounts": accounts})
+    # The projection already carries each account plus its balance as of
+    # today, so the page iterates those rather than annotating separately.
+    projection = project_household(request.household)
+    return render(request, "budget/account_list.html", {"projection": projection})
 
 
 @household_required

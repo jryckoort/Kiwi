@@ -2,18 +2,30 @@
 {% block title %}Tableau de bord{% endblock %}
 {% block page_title %}Tableau de bord{% endblock %}
 {% block content %}
-<div class="mb-6 grid gap-4 sm:grid-cols-3">
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Actifs</p>
-    <p class="mt-1 text-2xl font-semibold">{{ total_assets }}</p>
+    <p class="mt-1 text-2xl font-semibold">{{ total_assets|floatformat:2 }} {{ projection.base_currency }}</p>
   </div>
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Dettes</p>
-    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities }}</p>
+    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities|floatformat:2 }} {{ projection.base_currency }}</p>
   </div>
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Patrimoine net</p>
-    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth }}</p>
+    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth|floatformat:2 }} {{ projection.base_currency }}</p>
+  </div>
+  <div class="card {% if projection.totals.projected < 0 %}border-red-300 bg-red-50{% endif %}">
+    <p class="text-xs uppercase text-stone-500">Solde projeté fin de mois</p>
+    <p class="mt-1 text-2xl font-semibold {% if projection.totals.projected < 0 %}text-red-600{% else %}text-stone-900{% endif %}">
+      {{ projection.totals.projected|floatformat:2 }} {{ projection.base_currency }}
+    </p>
+    <p class="mt-1 text-xs text-stone-500">
+      {{ projection.totals.current|floatformat:2 }} aujourd'hui
+      {% if projection.totals.movement %}
+      · {{ projection.totals.movement|floatformat:2 }} à venir
+      {% endif %}
+    </p>
   </div>
 </div>
 
@@ -34,6 +46,32 @@
     <canvas id="allocationChart" height="220"></canvas>
   </div>
   <div class="card overflow-x-auto p-0">
+    <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">
+      Prochaines échéances (d'ici au {{ projection.horizon_end|date:"d/m/Y" }})
+    </p>
+    <table class="w-full text-sm">
+      <tbody>
+        {% for item in upcoming_occurrences %}
+        <tr class="border-t border-stone-100">
+          <td class="px-4 py-2 text-xs text-stone-500">{{ item.date|date:"d/m" }}</td>
+          <td class="px-4 py-2">{{ item.recurrence.description }}</td>
+          <td class="px-4 py-2 text-right {% if item.recurrence.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
+            {{ item.recurrence.amount|floatformat:2 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td class="px-4 py-6 text-center text-stone-500">
+          Aucune échéance d'ici la fin du mois.
+          <a href="{% url 'budget:recurring_list' %}" class="text-emerald-700 underline">Déclarez vos récurrences</a>.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mb-6">
+  <div class="card overflow-x-auto p-0">
     <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">Transactions récentes</p>
     <table class="w-full text-sm">
       <tbody>
@@ -41,7 +79,7 @@
         <tr class="border-t border-stone-100">
           <td class="px-4 py-2 text-xs text-stone-500">{{ tx.date }}</td>
           <td class="px-4 py-2">{{ tx.description|default:tx.counterparty|default:tx.account.name }}</td>
-          <td class="px-4 py-2 text-right {% if tx.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">{{ tx.amount }}</td>
+          <td class="px-4 py-2 text-right {% if tx.amount < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">{{ tx.amount|floatformat:2 }}</td>
         </tr>
         {% empty %}
         <tr><td class="px-4 py-6 text-center text-stone-500">Aucune transaction.</td></tr>

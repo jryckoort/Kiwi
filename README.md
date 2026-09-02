@@ -112,6 +112,24 @@ Les échéances sont calculées comme `date de début + n × période` plutôt q
 avançant de proche en proche : un loyer au 31 retombe au 28 en février puis
 **revient** au 31, au lieu de dériver définitivement.
 
+### Solde projeté en fin de mois
+
+Le tableau de bord et la liste des comptes affichent un solde projeté,
+décomposé plutôt que présenté comme un chiffre magique :
+
+```
+  solde d'aujourd'hui
++ transactions déjà saisies mais datées dans le futur
++ échéances récurrentes restantes
+= solde projeté en fin de mois
+```
+
+Seules les échéances **strictement postérieures à aujourd'hui** sont
+projetées : celles déjà passées ce mois-ci sont supposées présentes dans le
+solde (importées ou saisies), les reprojeter les compterait deux fois. La
+projection suppose donc vos imports bancaires à jour. Un compte qui passe
+sous zéro d'ici la fin du mois est signalé en rouge.
+
 ## Calcul du patrimoine net
 
 Le patrimoine net additionne les soldes des comptes, la valeur de marché des

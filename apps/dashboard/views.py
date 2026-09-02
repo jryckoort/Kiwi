@@ -8,8 +8,20 @@ from django.shortcuts import render
 
 from apps.accounts.decorators import household_required
 from apps.budget.models import Transaction
+from apps.budget.projections import project_household
 from apps.wealth.models import NetWorthSnapshot
 from apps.wealth.services import compute_net_worth
+
+
+def _next_occurrences(projection, limit):
+    """Flatten the per-account occurrences into one date-sorted shortlist."""
+    occurrences = [
+        occurrence
+        for account_projection in projection["projections"]
+        for occurrence in account_projection.occurrences
+    ]
+    occurrences.sort(key=lambda row: row["date"])
+    return occurrences[:limit]
 
 
 @household_required
@@ -31,6 +43,7 @@ def home(request):
         monthly_expense.append(float(-expense))
 
     total_assets, total_liabilities, net_worth, breakdown = compute_net_worth(household)
+    projection = project_household(household, as_of=today)
 
     history = list(
         NetWorthSnapshot.objects.for_household(household).order_by("date").values("date", "net_worth")
@@ -61,5 +74,7 @@ def home(request):
         "allocation_labels": json.dumps(allocation_labels),
         "allocation_values": json.dumps(allocation_values),
         "recent_transactions": recent_transactions,
+        "projection": projection,
+        "upcoming_occurrences": _next_occurrences(projection, limit=5),
     }
     return render(request, "dashboard/home.html", context)
