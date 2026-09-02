@@ -12,8 +12,12 @@ from .models import (
 
 @admin.register(Security)
 class SecurityAdmin(admin.ModelAdmin):
-    list_display = ("identifier", "name", "type", "currency")
-    search_fields = ("identifier", "name")
+    list_display = (
+        "identifier", "name", "type", "currency", "yahoo_symbol", "last_synced_at", "last_sync_error"
+    )
+    list_filter = ("type",)
+    search_fields = ("identifier", "name", "yahoo_symbol")
+    readonly_fields = ("last_synced_at", "last_sync_error")
 
 
 @admin.register(PriceSnapshot)

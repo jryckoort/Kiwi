@@ -83,14 +83,6 @@ s'affiche directement dans la console du serveur. En production, renseignez
 les variables `EMAIL_*` du `.env` avec n'importe quel fournisseur SMTP
 (Gmail SMTP, Resend, Mailgun, Postmark...).
 
-## Fiscalité belge — avertissement
-
-Les calculateurs de `apps/taxes` sont fournis à titre indicatif. Les taux et
-seuils (TOB, précompte mobilier, taxe sur la plus-value entrée en vigueur en
-2026) sont stockés en base et modifiables depuis l'admin Django — vérifiez
-toujours les valeurs en vigueur auprès du SPF Finances avant de vous y fier
-pour une déclaration réelle.
-
 ## Budgets et transactions récurrentes
 
 Les **budgets** se définissent par catégorie, par mois et par personne — chaque
@@ -144,6 +136,41 @@ Patrimoine :
 - un montant dans une devise sans taux de change disponible est compté tel
   quel, sans conversion.
 
+## Cours de bourse automatiques (Yahoo Finance)
+
+Renseignez le champ **symbole Yahoo** d'un titre (dans l'admin Django) et ses
+cours sont récupérés automatiquement deux fois par jour par Celery.
+
+⚠️ Le symbole Yahoo est **distinct de l'ISIN** : Yahoo ne sait pas chercher par
+ISIN. Pour l'ETF `IE00B4L5Y983`, il faut par exemple `IWDA.AS` (listing
+d'Amsterdam, en EUR) ou `IWDA.L` (Londres, en USD). Un titre sans symbole
+reste en saisie manuelle, ce qui est parfaitement valable.
+
+Kiwi **refuse** un cours dont la devise ne correspond pas à celle enregistrée
+pour le titre : Yahoo sert le même ISIN depuis plusieurs places, et stocker un
+cours en USD sur une ligne libellée en EUR fausserait tout le patrimoine sans
+prévenir. L'erreur est alors affichée sur la page Patrimoine.
+
+En commandes manuelles :
+
+```bash
+# rafraîchir tous les cours maintenant
+python manage.py update_security_prices
+
+# récupérer l'historique — utile pour la valeur de référence au 31/12/2025
+# que la taxe belge sur la plus-value utilise pour les positions antérieures
+python manage.py backfill_security_prices --since 2025-12-01 --until 2026-01-15
+```
+
+Un cours de plus de 7 jours (`STALE_PRICE_AFTER_DAYS`) est signalé comme
+potentiellement périmé sur la page Patrimoine, et les échecs de
+synchronisation y sont affichés — inutile d'aller lire les logs Celery.
+
+yfinance s'appuie sur une API Yahoo non officielle qui change sans préavis.
+L'appel réseau est isolé dans `apps/wealth/pricing.py` (`fetch_quote` /
+`fetch_history`) et injecté partout ailleurs : changer de fournisseur ne
+touche qu'une fonction, et les tests ne dépendent jamais du réseau.
+
 ## Fiscalité belge — avertissement
 
 Les calculateurs de `apps/taxes` sont fournis à titre indicatif. Les taux et
@@ -159,7 +186,6 @@ précède.
 
 ## Suites prévues (hors périmètre de cette première version)
 
-- Récupération automatique des cours de bourse
 - Connexion OAuth (Google)
 - Répartition de l'exonération de plus-value par personne (actuellement
   agrégée au niveau du foyer)

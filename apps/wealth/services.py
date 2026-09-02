@@ -1,6 +1,9 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
+
+from django.conf import settings
 
 from apps.fx.services import to_base_currency
 
@@ -10,6 +13,21 @@ from .models import Liability, NetWorthSnapshot, RealAsset, Security, SecurityTr
 def latest_price(security):
     snapshot = security.prices.order_by("-date").first()
     return snapshot.price if snapshot else None
+
+
+def latest_quote(security):
+    """Most recent price with its date, so callers can judge staleness."""
+    snapshot = security.prices.order_by("-date").first()
+    if snapshot is None:
+        return None, None
+    return snapshot.price, snapshot.date
+
+
+def is_stale(quote_date, as_of=None):
+    if quote_date is None:
+        return True
+    as_of = as_of or date.today()
+    return (as_of - quote_date).days > settings.STALE_PRICE_AFTER_DAYS
 
 
 @dataclass
@@ -122,7 +140,7 @@ def compute_net_worth(household):
 
         for holding in compute_holdings(account):
             security = Security.objects.get(pk=holding.security_id)
-            price = latest_price(security)
+            price, quote_date = latest_quote(security)
             if price is None:
                 # No quote on file — fall back to what was paid rather than
                 # dropping the position out of the total entirely.
@@ -130,6 +148,10 @@ def compute_net_worth(household):
                 warnings.append(f"{security.name} : aucun cours connu, valorisé au prix de revient")
             else:
                 value = price * holding.quantity
+                if is_stale(quote_date):
+                    warnings.append(
+                        f"{security.name} : cours du {quote_date:%d/%m/%Y}, potentiellement périmé"
+                    )
             value = to_base_currency(
                 value, security.currency_id, base_currency, security.name, warnings
             )

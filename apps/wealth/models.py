@@ -22,6 +22,17 @@ class Security(models.Model):
     name = models.CharField("nom", max_length=150)
     type = models.CharField("type", max_length=10, choices=Type.choices, default=Type.ETF)
     currency = models.ForeignKey("fx.Currency", on_delete=models.PROTECT, related_name="+")
+    yahoo_symbol = models.CharField(
+        "symbole Yahoo Finance",
+        max_length=30,
+        blank=True,
+        help_text=(
+            "Ticker Yahoo, distinct de l'ISIN — Yahoo ne sait pas chercher par ISIN. "
+            "Ex: IWDA.AS pour le listing d'Amsterdam. Laissez vide pour saisir les cours à la main."
+        ),
+    )
+    last_synced_at = models.DateTimeField("dernière synchro", null=True, blank=True)
+    last_sync_error = models.CharField("dernière erreur de synchro", max_length=255, blank=True)
 
     class Meta:
         verbose_name = "valeur mobilière"
@@ -30,6 +41,10 @@ class Security(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.identifier})"
+
+    @property
+    def is_auto_priced(self):
+        return bool(self.yahoo_symbol)
 
 
 class PriceSnapshot(models.Model):

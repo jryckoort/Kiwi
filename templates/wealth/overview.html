@@ -17,6 +17,18 @@
   </div>
 </div>
 
+{% if price_feed_errors %}
+<div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+  <p class="font-semibold">Récupération automatique des cours en échec :</p>
+  <ul class="mt-1 list-inside list-disc">
+    {% for security in price_feed_errors %}
+    <li>{{ security.name }} ({{ security.yahoo_symbol|default:"sans symbole" }}) — {{ security.last_sync_error }}</li>
+    {% endfor %}
+  </ul>
+  <p class="mt-2 text-xs">Les valorisations ci-dessous utilisent le dernier cours connu.</p>
+</div>
+{% endif %}
+
 {% if valuation_warnings %}
 <div class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
   <p class="font-semibold">Valorisation approximative :</p>
@@ -53,7 +65,16 @@
         <td class="px-4 py-2">{{ row.security.name }}</td>
         <td class="px-4 py-2 text-right">{{ row.quantity|floatformat:"-4" }}</td>
         <td class="px-4 py-2 text-right">{{ row.average_cost|floatformat:2 }}</td>
-        <td class="px-4 py-2 text-right">{% if row.price is None %}—{% else %}{{ row.price|floatformat:2 }}{% endif %}</td>
+        <td class="px-4 py-2 text-right">
+          {% if row.price is None %}—{% else %}
+          {{ row.price|floatformat:2 }}
+          {% if row.quote_date %}
+          <span class="block text-xs {% if row.is_stale %}font-medium text-amber-600{% else %}text-stone-400{% endif %}">
+            {{ row.quote_date|date:"d/m/Y" }}{% if row.is_stale %} ⚠{% endif %}
+          </span>
+          {% endif %}
+          {% endif %}
+        </td>
         <td class="px-4 py-2 text-right">{% if row.market_value is None %}—{% else %}{{ row.market_value|floatformat:2 }}{% endif %}</td>
         <td class="px-4 py-2 text-right {% if row.unrealized_gain and row.unrealized_gain < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
           {% if row.unrealized_gain is None %}—{% else %}{{ row.unrealized_gain|floatformat:2 }}{% endif %}

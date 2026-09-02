@@ -141,7 +141,15 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.wealth.tasks.snapshot_all_households_net_worth",
         "schedule": 60 * 60 * 24,  # runs daily, task itself only snapshots once/month
     },
+    "fetch-daily-security-prices": {
+        "task": "apps.wealth.tasks.fetch_daily_security_prices",
+        "schedule": 60 * 60 * 12,  # twice a day is plenty for daily closes
+    },
 }
+
+# A quote older than this is flagged as stale in the UI, so a net worth built
+# on a forgotten price can't quietly look authoritative.
+STALE_PRICE_AFTER_DAYS = 7
 
 # CSV imports: cap upload size to something sane for a bank statement export.
 MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
