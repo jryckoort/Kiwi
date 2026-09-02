@@ -1,16 +1,16 @@
-"""Automatic security prices from Yahoo Finance.
+"""Fetching and storing security prices.
 
-yfinance talks to an unofficial Yahoo endpoint that changes without notice,
-so the network call is isolated in ``fetch_quote`` / ``fetch_history`` and
-injected into everything else. That keeps the tests off the network and makes
-swapping provider a one-function change if Yahoo breaks again.
+The market-data source is pluggable (see ``apps/wealth/providers``) and chosen
+by config, so this module never imports a provider library directly. Tests
+pass a fake provider in; production passes none and the configured one is used.
 
-Two rules the rest of the module enforces, both about not corrupting money:
+Two rules protect the valuations built on these prices:
 
 * a quote whose currency disagrees with ``Security.currency`` is refused
-  rather than stored — writing a USD price against a EUR-denominated holding
-  would silently inflate net worth;
-* one failing ticker never aborts the run, and the reason is written to
+  rather than stored — a USD price against a EUR-denominated holding would
+  silently inflate net worth. Providers that don't report a currency (Stooq)
+  return ``None`` and the configured currency is trusted;
+* one failing security never aborts the run, and the reason is written to
   ``Security.last_sync_error`` so a self-hosted user sees it in the app
   instead of having to read Celery logs.
 """
@@ -18,17 +18,13 @@ Two rules the rest of the module enforces, both about not corrupting money:
 import logging
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
 
 from .models import PriceSnapshot, Security
+from .providers import PriceUnavailable, provider_for
 
 logger = logging.getLogger(__name__)
-
-
-class PriceUnavailable(Exception):
-    """Raised when a quote could not be obtained or trusted."""
 
 
 @dataclass
@@ -42,64 +38,18 @@ class SyncResult:
         return not self.error
 
 
-def fetch_quote(symbol):
-    """Latest close for ``symbol``. Returns ``(date, price, currency)``.
-
-    The only place that touches the network for a single quote.
-    """
-    import yfinance as yf
-
-    ticker = yf.Ticker(symbol)
-    history = ticker.history(period="5d", auto_adjust=False)
-    if history is None or history.empty:
-        raise PriceUnavailable(f"Aucune cotation renvoyée pour {symbol}")
-
-    last = history.iloc[-1]
-    quote_date = history.index[-1].date()
-    price = Decimal(str(last["Close"]))
-
-    currency = None
-    try:
-        currency = ticker.fast_info.get("currency")
-    except Exception:  # noqa: BLE001 - fast_info is best-effort metadata
-        logger.warning("Devise indisponible pour %s", symbol)
-
-    return quote_date, price, currency
-
-
-def fetch_history(symbol, start, end):
-    """Daily closes for ``symbol`` between two dates.
-
-    Returns a list of ``(date, price)`` plus the quote currency.
-    """
-    import yfinance as yf
-
-    ticker = yf.Ticker(symbol)
-    history = ticker.history(start=start, end=end, auto_adjust=False)
-    if history is None or history.empty:
-        raise PriceUnavailable(f"Aucun historique renvoyé pour {symbol}")
-
-    currency = None
-    try:
-        currency = ticker.fast_info.get("currency")
-    except Exception:  # noqa: BLE001
-        logger.warning("Devise indisponible pour %s", symbol)
-
-    rows = [(index.date(), Decimal(str(row["Close"]))) for index, row in history.iterrows()]
-    return rows, currency
-
-
 def _check_currency(security, quote_currency):
     """Refuse a quote denominated in something other than the security's currency.
 
-    Yahoo happily serves the same ISIN from several listings; storing a price
-    in the wrong currency would silently distort every valuation built on it.
+    Providers happily serve the same instrument from several listings; storing
+    a price in the wrong currency would silently distort every valuation built
+    on it. ``None`` means the provider didn't say, so we trust the config.
     """
     if not quote_currency:
-        return  # provider did not say; trust the configured currency
+        return
     if quote_currency.upper() != security.currency_id.upper():
         raise PriceUnavailable(
-            f"Devise incohérente : Yahoo cote {security.yahoo_symbol} en "
+            f"Devise incohérente : le fournisseur cote {security.price_symbol} en "
             f"{quote_currency.upper()}, or le titre est enregistré en {security.currency_id}"
         )
 
@@ -110,55 +60,62 @@ def _record_failure(security, message):
     logger.warning("Échec de synchro pour %s : %s", security, message)
 
 
-def sync_security_price(security, fetch=fetch_quote):
+def _record_success(security):
+    security.last_synced_at = timezone.now()
+    security.last_sync_error = ""
+    security.save(update_fields=["last_synced_at", "last_sync_error"])
+
+
+def _store(security, quote_date, price):
+    # Providers validate as they parse, but this is money: re-check here so a
+    # provider that forgets can't write a nonsense price into a valuation.
+    if price is None or price <= 0:
+        raise PriceUnavailable(f"Cours non exploitable : {price}")
+    PriceSnapshot.objects.update_or_create(
+        security=security, date=quote_date, defaults={"price": price}
+    )
+
+
+def sync_security_price(security, provider=None):
     """Fetch and store the latest quote for one security."""
     result = SyncResult(security=security)
 
-    if not security.yahoo_symbol:
-        result.error = "Aucun symbole Yahoo configuré"
+    if not security.price_symbol:
+        result.error = "Aucun symbole de cours configuré"
         return result
 
     try:
-        quote_date, price, currency = fetch(security.yahoo_symbol)
+        source = provider or provider_for(security)
+        quote_date, price, currency = source.fetch_quote(security.price_symbol)
         _check_currency(security, currency)
-        if price <= 0:
-            raise PriceUnavailable(f"Cours non exploitable ({price})")
+        _store(security, quote_date, price)
     except PriceUnavailable as exc:
         result.error = str(exc)
         _record_failure(security, result.error)
         return result
-    except (InvalidOperation, KeyError, IndexError, TypeError, ValueError) as exc:
-        result.error = f"Réponse inattendue du fournisseur : {exc}"
-        _record_failure(security, result.error)
-        return result
-    except Exception as exc:  # noqa: BLE001 - network/provider errors are open-ended
+    except Exception as exc:  # noqa: BLE001 - provider errors are open-ended
         result.error = f"{type(exc).__name__}: {exc}"
         _record_failure(security, result.error)
         return result
 
-    PriceSnapshot.objects.update_or_create(
-        security=security, date=quote_date, defaults={"price": price}
-    )
-    security.last_synced_at = timezone.now()
-    security.last_sync_error = ""
-    security.save(update_fields=["last_synced_at", "last_sync_error"])
+    _record_success(security)
     result.stored = 1
     return result
 
 
-def sync_all_prices(fetch=fetch_quote):
-    """Refresh every security that has a Yahoo symbol configured.
+def sync_all_prices(provider=None):
+    """Refresh every security that has a symbol configured.
 
-    A failure on one ticker is recorded and the run continues — one delisted
+    A failure on one security is recorded and the run continues — one delisted
     holding must not stop the rest of the portfolio from being priced.
     """
-    results = []
-    for security in Security.objects.exclude(yahoo_symbol=""):
-        results.append(sync_security_price(security, fetch=fetch))
-    return results
+    return [
+        sync_security_price(security, provider=provider)
+        for security in Security.objects.exclude(price_symbol="")
+    ]
 
 
-def backfill_security_history(security, start, end=None, fetch=fetch_history):
+def backfill_security_history(security, start, end=None, provider=None):
     """Store daily closes over a period.
 
     Handy to populate the 31/12/2025 reference price the Belgian plus-value
@@ -167,12 +124,13 @@ def backfill_security_history(security, start, end=None, fetch=fetch_history):
     result = SyncResult(security=security)
     end = end or date.today()
 
-    if not security.yahoo_symbol:
-        result.error = "Aucun symbole Yahoo configuré"
+    if not security.price_symbol:
+        result.error = "Aucun symbole de cours configuré"
         return result
 
     try:
-        rows, currency = fetch(security.yahoo_symbol, start, end)
+        source = provider or provider_for(security)
+        rows, currency = source.fetch_history(security.price_symbol, start, end)
         _check_currency(security, currency)
     except PriceUnavailable as exc:
         result.error = str(exc)
@@ -184,14 +142,11 @@ def backfill_security_history(security, start, end=None, fetch=fetch_history):
         return result
 
     for quote_date, price in rows:
-        if price <= 0:
-            continue
-        PriceSnapshot.objects.update_or_create(
-            security=security, date=quote_date, defaults={"price": price}
-        )
+        try:
+            _store(security, quote_date, price)
+        except PriceUnavailable:
+            continue  # skip one bad day rather than losing the whole range
         result.stored += 1
 
-    security.last_synced_at = timezone.now()
-    security.last_sync_error = ""
-    security.save(update_fields=["last_synced_at", "last_sync_error"])
+    _record_success(security)
     return result

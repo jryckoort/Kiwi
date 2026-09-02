@@ -151,6 +151,14 @@ CELERY_BEAT_SCHEDULE = {
 # on a forgotten price can't quietly look authoritative.
 STALE_PRICE_AFTER_DAYS = 7
 
+# Market data source: "yahoo" (no key, best ETF coverage, unofficial API),
+# "stooq" (no key, plain CSV, does not report the quote currency) or
+# "twelvedata" (needs TWELVEDATA_API_KEY, reports the currency).
+# Symbols are provider-specific — switching provider usually means revisiting
+# the symbol on each security.
+SECURITY_PRICE_PROVIDER = env("SECURITY_PRICE_PROVIDER", default="yahoo")
+TWELVEDATA_API_KEY = env("TWELVEDATA_API_KEY", default="")
+
 # CSV imports: cap upload size to something sane for a bank statement export.
 MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_IMPORT_FILE_SIZE_BYTES

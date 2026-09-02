@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 
 from .models import (
@@ -8,16 +9,27 @@ from .models import (
     Security,
     SecurityTransaction,
 )
+from .providers import PROVIDER_CHOICES
 
 
 @admin.register(Security)
 class SecurityAdmin(admin.ModelAdmin):
     list_display = (
-        "identifier", "name", "type", "currency", "yahoo_symbol", "last_synced_at", "last_sync_error"
+        "identifier", "name", "type", "currency", "price_symbol", "price_provider",
+        "last_synced_at", "last_sync_error",
     )
-    list_filter = ("type",)
-    search_fields = ("identifier", "name", "yahoo_symbol")
+    list_filter = ("type", "price_provider")
+    search_fields = ("identifier", "name", "price_symbol")
     readonly_fields = ("last_synced_at", "last_sync_error")
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        # Offer the configured providers as a dropdown rather than free text,
+        # with an example symbol for each since notations differ.
+        if db_field.name == "price_provider":
+            kwargs["widget"] = forms.Select(
+                choices=[("", "Par défaut (SECURITY_PRICE_PROVIDER)"), *PROVIDER_CHOICES]
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 @admin.register(PriceSnapshot)

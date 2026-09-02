@@ -136,40 +136,74 @@ Patrimoine :
 - un montant dans une devise sans taux de change disponible est compté tel
   quel, sans conversion.
 
-## Cours de bourse automatiques (Yahoo Finance)
+## Cours de bourse automatiques
 
-Renseignez le champ **symbole Yahoo** d'un titre (dans l'admin Django) et ses
-cours sont récupérés automatiquement deux fois par jour par Celery.
+La source de données est **configurable** — c'est une décision de config, pas
+un changement de code :
 
-⚠️ Le symbole Yahoo est **distinct de l'ISIN** : Yahoo ne sait pas chercher par
-ISIN. Pour l'ETF `IE00B4L5Y983`, il faut par exemple `IWDA.AS` (listing
-d'Amsterdam, en EUR) ou `IWDA.L` (Londres, en USD). Un titre sans symbole
-reste en saisie manuelle, ce qui est parfaitement valable.
+```bash
+SECURITY_PRICE_PROVIDER=yahoo   # ou stooq, ou twelvedata
+```
+
+| Source | Clé API | Palier gratuit | Devise renvoyée | Notation |
+|---|---|---|---|---|
+| `yahoo` | non | illimité de fait | oui | `IWDA.AS` |
+| `stooq` | **non** | illimité de fait | **non** | `iwda.nl` |
+| `twelvedata` | oui | généreux | oui | `IWDA.AS` |
+
+> Les paliers gratuits de ces services évoluent — vérifiez les conditions
+> courantes sur leur site avant de vous engager.
+
+**yahoo** a la meilleure couverture des ETF européens mais s'appuie sur une API
+non officielle qui casse régulièrement. **stooq** ne demande aucune clé ni
+inscription et sert du CSV brut : c'est le filet de secours le plus robuste
+pour un usage léger, au prix de ne pas renvoyer la devise du cours.
+**twelvedata** demande une clé (`TWELVEDATA_API_KEY`) mais renvoie la devise,
+ce qui permet au garde-fou ci-dessous de fonctionner pleinement.
+
+### Symboles
+
+Renseignez le **symbole de cours** d'un titre dans l'admin Django. Il est
+distinct de l'ISIN — aucun de ces fournisseurs ne sait chercher par ISIN — et
+**propre à chaque source** : le même ETF est `IWDA.AS` chez Yahoo et
+`iwda.nl` chez Stooq. Changer de fournisseur implique donc généralement de
+revoir les symboles.
+
+Un titre peut surcharger le fournisseur global via son champ **fournisseur de
+cours** (utile si une ligne n'est cotée que par une seule source). Un titre
+sans symbole reste en saisie manuelle, ce qui est parfaitement valable.
+
+### Garde-fous
 
 Kiwi **refuse** un cours dont la devise ne correspond pas à celle enregistrée
-pour le titre : Yahoo sert le même ISIN depuis plusieurs places, et stocker un
-cours en USD sur une ligne libellée en EUR fausserait tout le patrimoine sans
-prévenir. L'erreur est alors affichée sur la page Patrimoine.
+pour le titre : stocker un cours en USD sur une ligne libellée en EUR
+fausserait tout le patrimoine sans prévenir. Les fournisseurs qui ne
+communiquent pas la devise (Stooq) laissent Kiwi faire confiance à la config —
+vérifiez donc la devise vous-même à la saisie.
 
-En commandes manuelles :
+Un échec sur un titre n'interrompt jamais les autres : la raison est écrite en
+base et **affichée sur la page Patrimoine**, inutile d'aller lire les logs
+Celery. Un cours de plus de 7 jours (`STALE_PRICE_AFTER_DAYS`) y est signalé
+comme potentiellement périmé.
+
+### Commandes
 
 ```bash
 # rafraîchir tous les cours maintenant
 python manage.py update_security_prices
+
+# essayer une autre source sans toucher au .env
+python manage.py update_security_prices --provider stooq
 
 # récupérer l'historique — utile pour la valeur de référence au 31/12/2025
 # que la taxe belge sur la plus-value utilise pour les positions antérieures
 python manage.py backfill_security_prices --since 2025-12-01 --until 2026-01-15
 ```
 
-Un cours de plus de 7 jours (`STALE_PRICE_AFTER_DAYS`) est signalé comme
-potentiellement périmé sur la page Patrimoine, et les échecs de
-synchronisation y sont affichés — inutile d'aller lire les logs Celery.
-
-yfinance s'appuie sur une API Yahoo non officielle qui change sans préavis.
-L'appel réseau est isolé dans `apps/wealth/pricing.py` (`fetch_quote` /
-`fetch_history`) et injecté partout ailleurs : changer de fournisseur ne
-touche qu'une fonction, et les tests ne dépendent jamais du réseau.
+Ajouter une source revient à écrire une classe dans
+`apps/wealth/providers/` exposant `fetch_quote` et `fetch_history`, puis à
+l'enregistrer dans le registre — rien d'autre dans l'application ne connaît
+le fournisseur.
 
 ## Fiscalité belge — avertissement
 
