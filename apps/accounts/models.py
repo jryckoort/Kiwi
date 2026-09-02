@@ -42,7 +42,11 @@ class PersonallyOwnedModel(HouseholdOwnedModel):
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        # PROTECT, not SET_NULL: owner=None means "commun au foyer", so
+        # SET_NULL would silently turn a member's private account into a
+        # shared one when their user is deleted. Deleting a member has to be
+        # an explicit decision about what happens to their accounts.
+        on_delete=models.PROTECT,
         related_name="+",
         help_text="Laisser vide pour un élément commun au foyer.",
     )

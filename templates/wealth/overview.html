@@ -5,17 +5,26 @@
 <div class="mb-6 grid gap-4 sm:grid-cols-3">
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Actifs</p>
-    <p class="mt-1 text-2xl font-semibold">{{ total_assets }}</p>
+    <p class="mt-1 text-2xl font-semibold">{{ total_assets|floatformat:2 }} {{ base_currency }}</p>
   </div>
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Dettes</p>
-    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities }}</p>
+    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities|floatformat:2 }} {{ base_currency }}</p>
   </div>
   <div class="card">
     <p class="text-xs uppercase text-stone-500">Patrimoine net</p>
-    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth }}</p>
+    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth|floatformat:2 }} {{ base_currency }}</p>
   </div>
 </div>
+
+{% if valuation_warnings %}
+<div class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+  <p class="font-semibold">Valorisation approximative :</p>
+  <ul class="mt-1 list-inside list-disc">
+    {% for warning in valuation_warnings %}<li>{{ warning }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
 
 <div class="mb-4 flex justify-end gap-2">
   <a href="{% url 'wealth:security_transaction_create' %}" class="btn-secondary">+ Opération titres</a>
@@ -42,12 +51,12 @@
       {% for row in group.rows %}
       <tr class="border-t border-stone-100">
         <td class="px-4 py-2">{{ row.security.name }}</td>
-        <td class="px-4 py-2 text-right">{{ row.quantity }}</td>
+        <td class="px-4 py-2 text-right">{{ row.quantity|floatformat:"-4" }}</td>
         <td class="px-4 py-2 text-right">{{ row.average_cost|floatformat:2 }}</td>
-        <td class="px-4 py-2 text-right">{{ row.price|default:"—" }}</td>
-        <td class="px-4 py-2 text-right">{{ row.market_value|default:"—" }}</td>
-        <td class="px-4 py-2 text-right {% if row.unrealized_gain < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
-          {{ row.unrealized_gain|default:"—" }}
+        <td class="px-4 py-2 text-right">{% if row.price is None %}—{% else %}{{ row.price|floatformat:2 }}{% endif %}</td>
+        <td class="px-4 py-2 text-right">{% if row.market_value is None %}—{% else %}{{ row.market_value|floatformat:2 }}{% endif %}</td>
+        <td class="px-4 py-2 text-right {% if row.unrealized_gain and row.unrealized_gain < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
+          {% if row.unrealized_gain is None %}—{% else %}{{ row.unrealized_gain|floatformat:2 }}{% endif %}
         </td>
       </tr>
       {% endfor %}

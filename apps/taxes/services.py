@@ -50,6 +50,20 @@ def compute_and_store_capital_gain(sell_tx):
     return record
 
 
+def recompute_capital_gains_for(account_id, security_id):
+    """Recompute every realized gain on one account+security pair.
+
+    FIFO means each sale's cost basis depends on the whole prior history, so
+    editing or deleting *any* transaction invalidates the records of every
+    sale that follows it — recomputing just the saved row is not enough.
+    """
+    sells = SecurityTransaction.objects.filter(
+        account_id=account_id, security_id=security_id, type=SecurityTransaction.Type.SELL
+    ).order_by("date", "id")
+    for sell in sells:
+        compute_and_store_capital_gain(sell)
+
+
 def compute_annual_plus_value_tax(household, year):
     """Aggregates realized gains for the household over a calendar year.
 

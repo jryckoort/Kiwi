@@ -116,3 +116,39 @@ def test_import_rows_creates_transactions_and_skips_duplicates_and_errors(househ
     assert skipped == 2  # 1 duplicate + 1 parse error
     assert Transaction.objects.filter(account=account, description="Salaire").exists()
     assert Transaction.objects.filter(account=account).count() == 2  # pre-existing + newly imported
+
+
+def test_upload_form_rejects_oversized_file(household_with_account):
+    from django.conf import settings
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.imports_app.forms import UploadForm
+
+    household, account = household_with_account
+    oversized = SimpleUploadedFile(
+        "releve.csv",
+        b"x" * (settings.MAX_IMPORT_FILE_SIZE_BYTES + 1),
+        content_type="text/csv",
+    )
+    form = UploadForm(
+        data={"account": account.pk}, files={"file": oversized}, household=household
+    )
+
+    assert not form.is_valid()
+    assert "trop volumineux" in str(form.errors["file"])
+
+
+def test_upload_form_rejects_non_csv(household_with_account):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.imports_app.forms import UploadForm
+
+    household, account = household_with_account
+    form = UploadForm(
+        data={"account": account.pk},
+        files={"file": SimpleUploadedFile("releve.pdf", b"whatever")},
+        household=household,
+    )
+
+    assert not form.is_valid()
+    assert "CSV" in str(form.errors["file"])

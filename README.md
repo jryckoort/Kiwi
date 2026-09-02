@@ -91,6 +91,33 @@ seuils (TOB, précompte mobilier, taxe sur la plus-value entrée en vigueur en
 toujours les valeurs en vigueur auprès du SPF Finances avant de vous y fier
 pour une déclaration réelle.
 
+## Calcul du patrimoine net
+
+Le patrimoine net additionne les soldes des comptes, la valeur de marché des
+positions en titres, les actifs réels, et soustrait les dettes. Tout est
+converti dans la devise de référence du foyer via `apps/fx`.
+
+Deux cas dégradent volontairement le calcul plutôt que de fausser
+silencieusement le total — ils sont alors signalés en jaune sur la page
+Patrimoine :
+
+- une position sans cours connu est valorisée à son prix de revient ;
+- un montant dans une devise sans taux de change disponible est compté tel
+  quel, sans conversion.
+
+## Fiscalité belge — avertissement
+
+Les calculateurs de `apps/taxes` sont fournis à titre indicatif. Les taux et
+seuils (TOB, précompte mobilier, taxe sur la plus-value entrée en vigueur en
+2026) sont stockés en base et modifiables depuis l'admin Django — vérifiez
+toujours les valeurs en vigueur auprès du SPF Finances avant de vous y fier
+pour une déclaration réelle.
+
+Les plus-values sont calculées en FIFO. Modifier ou supprimer une opération
+recalcule automatiquement toutes les ventes postérieures sur le même
+titre — le coût de revient d'une vente dépendant de tout l'historique qui la
+précède.
+
 ## Suites prévues (hors périmètre de cette première version)
 
 - Transactions récurrentes / budgets prévisionnels
@@ -98,3 +125,5 @@ pour une déclaration réelle.
 - Connexion OAuth (Google)
 - Répartition de l'exonération de plus-value par personne (actuellement
   agrégée au niveau du foyer)
+- Conversion de devises par triangulation (aujourd'hui seuls les taux
+  directs et inverses sont utilisés, ce qui couvre tous les cas EUR ↔ X)

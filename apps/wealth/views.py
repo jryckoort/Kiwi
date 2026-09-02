@@ -39,7 +39,7 @@ def overview(request):
 
     real_assets = RealAsset.objects.for_household(request.household).select_related("owner")
     liabilities = Liability.objects.for_household(request.household).select_related("owner")
-    total_assets, total_liabilities, net_worth, _ = compute_net_worth(request.household)
+    total_assets, total_liabilities, net_worth, breakdown = compute_net_worth(request.household)
 
     context = {
         "holdings_by_account": holdings_by_account,
@@ -48,6 +48,8 @@ def overview(request):
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
         "net_worth": net_worth,
+        "base_currency": request.household.base_currency,
+        "valuation_warnings": breakdown.get("warnings", []),
     }
     return render(request, "wealth/overview.html", context)
 

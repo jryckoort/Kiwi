@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 
 from apps.budget.models import FinancialAccount
 
@@ -31,6 +32,14 @@ class UploadForm(forms.Form):
         file = self.cleaned_data["file"]
         if not file.name.lower().endswith(".csv"):
             raise forms.ValidationError("Le fichier doit être au format CSV.")
+        # DATA_UPLOAD_MAX_MEMORY_SIZE explicitly excludes file uploads, so the
+        # size cap has to be enforced here.
+        max_size = settings.MAX_IMPORT_FILE_SIZE_BYTES
+        if file.size > max_size:
+            raise forms.ValidationError(
+                f"Fichier trop volumineux ({file.size // 1024} Ko). "
+                f"Maximum autorisé : {max_size // 1024 // 1024} Mo."
+            )
         return file
 
 

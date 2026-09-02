@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .models import Liability, NetWorthSnapshot, RealAsset, SecurityTransaction
+from .models import Liability, NetWorthSnapshot, RealAsset, Security, SecurityTransaction
 
 
 def latest_price(security):
@@ -86,31 +86,90 @@ def _consume_fifo(lots, quantity):
     return cost_removed
 
 
+def _to_base_currency(amount, currency_code, base_currency, label, warnings):
+    """Convert into the household's base currency, degrading gracefully.
+
+    A missing exchange rate must never silently distort the total: the raw
+    amount is still counted, but the item is recorded in ``warnings`` so the
+    UI can say the figure mixes currencies.
+    """
+    from apps.fx.services import ExchangeRateUnavailable, convert
+
+    if currency_code == base_currency:
+        return amount
+    try:
+        return convert(amount, currency_code, base_currency)
+    except ExchangeRateUnavailable:
+        warnings.append(f"{label} : montant en {currency_code} non converti (taux indisponible)")
+        return amount
+
+
 def compute_net_worth(household):
-    """Best-effort net worth in the household's base currency, ignoring FX
-    conversion for now (v1 assumes accounts mostly share the base currency —
-    proper multi-currency roll-up is a follow-up).
+    """Net worth in the household's base currency.
+
+    Covers cash accounts, the market value of security holdings, real assets
+    and liabilities. Amounts held in another currency are converted through
+    the fx app; anything that could not be converted is listed in
+    ``breakdown["warnings"]``.
     """
     from django.db.models import Sum
 
     from apps.budget.models import FinancialAccount
 
+    base_currency = household.base_currency
     total_assets = Decimal(0)
-    breakdown = {"accounts": {}, "real_assets": {}, "liabilities": {}}
+    warnings = []
+    breakdown = {
+        "accounts": {},
+        "securities": {},
+        "real_assets": {},
+        "liabilities": {},
+        "warnings": warnings,
+    }
 
-    for account in FinancialAccount.objects.for_household(household).filter(is_archived=False):
+    accounts = FinancialAccount.objects.for_household(household).filter(is_archived=False)
+    for account in accounts:
         balance = account.transactions.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        balance = _to_base_currency(
+            balance, account.currency_id, base_currency, account.name, warnings
+        )
         total_assets += balance
         breakdown["accounts"][account.name] = str(balance)
 
+        for holding in compute_holdings(account):
+            security = Security.objects.get(pk=holding.security_id)
+            price = latest_price(security)
+            if price is None:
+                # No quote on file — fall back to what was paid rather than
+                # dropping the position out of the total entirely.
+                value = holding.cost_basis
+                warnings.append(f"{security.name} : aucun cours connu, valorisé au prix de revient")
+            else:
+                value = price * holding.quantity
+            value = _to_base_currency(
+                value, security.currency_id, base_currency, security.name, warnings
+            )
+            total_assets += value
+            breakdown["securities"][f"{account.name} · {security.name}"] = str(value)
+
     for asset in RealAsset.objects.for_household(household):
-        total_assets += asset.current_value
-        breakdown["real_assets"][asset.name] = str(asset.current_value)
+        value = _to_base_currency(
+            asset.current_value, asset.currency_id, base_currency, asset.name, warnings
+        )
+        total_assets += value
+        breakdown["real_assets"][asset.name] = str(value)
 
     total_liabilities = Decimal(0)
     for liability in Liability.objects.for_household(household):
-        total_liabilities += liability.remaining_balance
-        breakdown["liabilities"][liability.name] = str(liability.remaining_balance)
+        value = _to_base_currency(
+            liability.remaining_balance,
+            liability.currency_id,
+            base_currency,
+            liability.name,
+            warnings,
+        )
+        total_liabilities += value
+        breakdown["liabilities"][liability.name] = str(value)
 
     net_worth = total_assets - total_liabilities
     return total_assets, total_liabilities, net_worth, breakdown

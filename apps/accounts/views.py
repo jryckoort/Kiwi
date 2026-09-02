@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import HouseholdCreateForm, HouseholdInviteForm, MagicLinkRequestForm, SignupForm
@@ -14,11 +15,26 @@ from .middleware import ActiveHouseholdMiddleware
 from .models import HouseholdInvite, HouseholdMembership, MagicLoginToken, User
 
 
+def _safe_redirect_target(request, url):
+    """Only follow a caller-supplied redirect if it stays on this site.
+
+    Without this an attacker could send ...?next=https://evil.example and
+    bounce a freshly-signed-in user onto a lookalike phishing page.
+    """
+    if url and url_has_allowed_host_and_scheme(
+        url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return url
+    return None
+
+
 def signup(request):
     if request.user.is_authenticated:
         return redirect("dashboard:home")
 
-    next_url = request.POST.get("next") or request.GET.get("next")
+    next_url = _safe_redirect_target(
+        request, request.POST.get("next") or request.GET.get("next")
+    )
 
     if request.method == "POST":
         form = SignupForm(request.POST)
@@ -96,7 +112,8 @@ def household_switch(request, household_id):
     )
     request.session[ActiveHouseholdMiddleware.SESSION_KEY] = membership.household_id
     messages.info(request, f"Foyer actif : {membership.household.name}")
-    return redirect(request.META.get("HTTP_REFERER", "dashboard:home"))
+    back_to = _safe_redirect_target(request, request.META.get("HTTP_REFERER"))
+    return redirect(back_to or "dashboard:home")
 
 
 @login_required
