@@ -80,7 +80,15 @@ a **shared** one when their user is deleted. Used by `FinancialAccount`,
 
 Actuals are attributed to a person **through the account** a transaction sits
 on — personal account → that member's budget, joint account → commun. Nothing
-extra is tagged at entry or import time.
+extra is tagged at entry or import time. Security holdings follow the same
+rule, via the brokerage account they sit in.
+
+`apps/accounts/perimeters.py` is the single place that labels and orders those
+owners: **Moi → Commun au foyer → autres membres**. It is presentation only —
+every member still sees everything, the household is the trust boundary. Pass
+`viewer=request.user` to get the "Moi" labelling; omit it (as background jobs
+do) and the neutral commun-first ordering is used instead. Reuse
+`group_by_owner()` rather than re-deriving this per page.
 
 ### Money-correctness rules that are easy to break
 

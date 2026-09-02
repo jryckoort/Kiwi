@@ -2,19 +2,33 @@
 {% block title %}Patrimoine{% endblock %}
 {% block page_title %}Patrimoine{% endblock %}
 {% block content %}
-<div class="mb-6 grid gap-4 sm:grid-cols-3">
-  <div class="card">
-    <p class="text-xs uppercase text-stone-500">Actifs</p>
-    <p class="mt-1 text-2xl font-semibold">{{ total_assets|floatformat:2 }} {{ base_currency }}</p>
+
+<div class="card mb-6">
+  <p class="text-xs uppercase text-stone-500">Patrimoine net · famille</p>
+  <p class="mt-1 text-3xl font-semibold text-emerald-700">
+    {{ net_worth|floatformat:2 }} {{ base_currency }}
+  </p>
+  <p class="mt-1 text-sm text-stone-600">
+    {{ total_assets|floatformat:2 }} d'actifs − {{ total_liabilities|floatformat:2 }} de dettes
+  </p>
+</div>
+
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {% for group in groups %}
+  <div class="card {% if group.is_mine %}border-emerald-300{% endif %}">
+    <div class="flex items-baseline justify-between">
+      <p class="text-xs uppercase text-stone-500">{{ group.label }}</p>
+      {% if group.is_mine %}<span class="text-xs text-emerald-700">votre session</span>{% endif %}
+    </div>
+    <p class="mt-1 text-2xl font-semibold {% if group.net_worth < 0 %}text-red-600{% endif %}">
+      {{ group.net_worth|floatformat:2 }} {{ base_currency }}
+    </p>
+    <p class="mt-1 text-xs text-stone-500">
+      {{ group.assets|floatformat:2 }} d'actifs
+      {% if group.liabilities %}· {{ group.liabilities|floatformat:2 }} de dettes{% endif %}
+    </p>
   </div>
-  <div class="card">
-    <p class="text-xs uppercase text-stone-500">Dettes</p>
-    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities|floatformat:2 }} {{ base_currency }}</p>
-  </div>
-  <div class="card">
-    <p class="text-xs uppercase text-stone-500">Patrimoine net</p>
-    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth|floatformat:2 }} {{ base_currency }}</p>
-  </div>
+  {% endfor %}
 </div>
 
 {% if price_feed_errors %}
@@ -44,10 +58,45 @@
   <a href="{% url 'wealth:liability_create' %}" class="btn-secondary">+ Dette</a>
 </div>
 
-<h2 class="mb-2 font-semibold">Portefeuille titres</h2>
+<h2 class="mb-2 font-semibold">Détail par périmètre</h2>
+{% for group in groups %}
+<div class="card mb-4 p-0">
+  <div class="flex items-baseline justify-between border-b border-stone-200 bg-stone-50 px-4 py-2">
+    <p class="text-sm font-medium">{{ group.label }}</p>
+    <p class="text-xs text-stone-600">{{ group.net_worth|floatformat:2 }} {{ base_currency }}</p>
+  </div>
+  <div class="divide-y divide-stone-100">
+    {% for item in group.perimeter.rows %}
+    <div class="flex items-center justify-between px-4 py-2 text-sm">
+      <span>
+        {{ item.label }}
+        <span class="ml-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">
+          {% if item.kind == "account" %}Compte
+          {% elif item.kind == "security" %}Titres
+          {% elif item.kind == "real_asset" %}Actif réel
+          {% else %}Dette{% endif %}
+        </span>
+      </span>
+      <span class="{% if item.is_liability %}text-red-600{% endif %}">
+        {% if item.is_liability %}−{% endif %}{{ item.value|floatformat:2 }}
+      </span>
+    </div>
+    {% empty %}
+    <p class="px-4 py-4 text-sm text-stone-500">Rien dans ce périmètre pour l'instant.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+<h2 class="mb-2 mt-6 font-semibold">Portefeuille titres</h2>
 {% for group in holdings_by_account %}
 <div class="card mb-4 overflow-x-auto p-0">
-  <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">{{ group.account.name }}</p>
+  <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">
+    {{ group.account.name }}
+    <span class="ml-1 text-xs font-normal text-stone-500">
+      ({% if group.account.is_joint %}commun{% else %}{{ group.account.owner.get_short_name }}{% endif %})
+    </span>
+  </p>
   <table class="w-full text-sm">
     <thead class="text-left text-xs uppercase text-stone-500">
       <tr>
@@ -87,33 +136,4 @@
 {% empty %}
 <p class="mb-6 text-sm text-stone-500">Aucune position en portefeuille pour l'instant.</p>
 {% endfor %}
-
-<div class="grid gap-6 md:grid-cols-2">
-  <div class="card">
-    <h2 class="mb-4 font-semibold">Actifs réels</h2>
-    <ul class="space-y-2 text-sm">
-      {% for asset in real_assets %}
-      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
-        <span>{{ asset.name }} <span class="text-xs text-stone-500">({{ asset.get_type_display }})</span></span>
-        <span class="font-medium">{{ asset.current_value }} {{ asset.currency_id }}</span>
-      </li>
-      {% empty %}
-      <li class="text-stone-500">Aucun actif réel.</li>
-      {% endfor %}
-    </ul>
-  </div>
-  <div class="card">
-    <h2 class="mb-4 font-semibold">Dettes</h2>
-    <ul class="space-y-2 text-sm">
-      {% for liability in liabilities %}
-      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
-        <span>{{ liability.name }} <span class="text-xs text-stone-500">({{ liability.get_type_display }})</span></span>
-        <span class="font-medium text-red-600">{{ liability.remaining_balance }} {{ liability.currency_id }}</span>
-      </li>
-      {% empty %}
-      <li class="text-stone-500">Aucune dette.</li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
 {% endblock %}

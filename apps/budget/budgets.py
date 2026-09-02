@@ -18,6 +18,7 @@ from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 
+from apps.accounts.perimeters import perimeter_labels, sort_key
 from apps.fx.services import to_base_currency
 
 from .models import BudgetLine, Category, RecurringTransaction, Transaction
@@ -63,11 +64,20 @@ class BudgetGroup:
     """All rows belonging to one member, or to the commun budget."""
 
     owner: object  # User or None
+    viewer: object = None
     rows: list = field(default_factory=list)
 
     @property
     def label(self):
-        return self.owner.get_short_name() if self.owner else "Commun"
+        return perimeter_labels(self.owner, self.viewer)[1]
+
+    @property
+    def is_mine(self):
+        return (
+            self.owner is not None
+            and self.viewer is not None
+            and self.owner.pk == self.viewer.pk
+        )
 
     @property
     def planned_total(self):
@@ -87,8 +97,12 @@ def _magnitude(amount, kind):
     return -amount if kind == Category.Kind.EXPENSE else amount
 
 
-def budget_vs_actuals(household, month):
-    """Return (groups, warnings) comparing plan and reality for one month."""
+def budget_vs_actuals(household, month, viewer=None):
+    """Return (groups, warnings) comparing plan and reality for one month.
+
+    ``viewer`` only affects presentation: their own perimeter is labelled
+    « Moi » and listed first. Nothing is hidden from anyone.
+    """
     start, end = month_bounds(month)
     base_currency = household.base_currency
     warnings = []
@@ -148,16 +162,14 @@ def budget_vs_actuals(household, month):
     for row in rows.values():
         owner_id = row.owner.id if row.owner else None
         if owner_id not in groups:
-            groups[owner_id] = BudgetGroup(owner=row.owner)
+            groups[owner_id] = BudgetGroup(owner=row.owner, viewer=viewer)
         groups[owner_id].rows.append(row)
 
     for group in groups.values():
         group.rows.sort(key=lambda r: (r.category is None, r.category.name if r.category else ""))
 
-    # Commun first, then members by name.
-    ordered = sorted(
-        groups.values(), key=lambda g: (g.owner is not None, g.label.lower() if g.owner else "")
-    )
+    # Same order as everywhere else in the app: me, then commun, then others.
+    ordered = sorted(groups.values(), key=lambda g: sort_key(g.owner, viewer))
     # Deduplicate identical warnings from many transactions in one currency.
     return ordered, list(dict.fromkeys(warnings))
 

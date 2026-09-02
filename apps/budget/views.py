@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.accounts.decorators import household_required
+from apps.accounts.perimeters import group_by_owner
 
 from .budgets import budget_vs_actuals, copy_budget_from_previous_month, current_month
 from .forms import (
@@ -27,7 +28,18 @@ def account_list(request):
     # The projection already carries each account plus its balance as of
     # today, so the page iterates those rather than annotating separately.
     projection = project_household(request.household)
-    return render(request, "budget/account_list.html", {"projection": projection})
+    groups = group_by_owner(
+        projection["projections"],
+        request.user,
+        owner_of=lambda item: item.account.owner,
+        include_owners=request.household.members.all(),
+        include_commun=True,
+    )
+    return render(
+        request,
+        "budget/account_list.html",
+        {"projection": projection, "groups": groups},
+    )
 
 
 @household_required
@@ -221,7 +233,7 @@ def budget_overview(request):
     else:
         form = BudgetLineForm(household=request.household)
 
-    groups, warnings = budget_vs_actuals(request.household, month)
+    groups, warnings = budget_vs_actuals(request.household, month, viewer=request.user)
     return render(
         request,
         "budget/budget_overview.html",

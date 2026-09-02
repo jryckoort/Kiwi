@@ -12,7 +12,7 @@
 <div class="card mb-6">
   <div class="flex flex-wrap items-baseline justify-between gap-4">
     <div>
-      <p class="text-xs uppercase text-stone-500">Solde projeté au {{ projection.horizon_end|date:"d/m/Y" }}</p>
+      <p class="text-xs uppercase text-stone-500">Famille · solde projeté au {{ projection.horizon_end|date:"d/m/Y" }}</p>
       <p class="mt-1 text-3xl font-semibold {% if projection.totals.projected < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
         {{ projection.totals.projected|floatformat:2 }} {{ projection.base_currency }}
       </p>
@@ -40,30 +40,44 @@
   {% endif %}
 </div>
 
-<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-  {% for item in projection.projections %}
-  <a href="{% url 'budget:account_detail' item.account.pk %}" class="card block hover:border-emerald-300">
-    <div class="flex items-center justify-between">
-      <span class="font-semibold">{{ item.account.name }}</span>
-      <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
-        {% if item.account.is_joint %}Commun{% else %}{{ item.account.owner.get_short_name }}{% endif %}
-      </span>
-    </div>
-    <p class="mt-1 text-xs text-stone-500">
-      {{ item.account.get_type_display }}{% if item.account.institution %} · {{ item.account.institution }}{% endif %}
-    </p>
-    <p class="mt-3 text-xl font-semibold {% if item.current_balance < 0 %}text-red-600{% endif %}">
-      {{ item.current_balance|floatformat:2 }} {{ item.account.currency_id }}
-    </p>
-    {% if item.movement %}
-    <p class="mt-1 text-xs {% if item.goes_negative %}font-semibold text-red-600{% else %}text-stone-500{% endif %}">
-      → {{ item.projected_balance|floatformat:2 }} fin de mois
-      {% if item.goes_negative %} (à découvert){% endif %}
-    </p>
-    {% endif %}
-  </a>
-  {% empty %}
-  <p class="text-sm text-stone-500">Aucun compte pour l'instant.</p>
-  {% endfor %}
-</div>
+{% for group in groups %}
+<section class="mb-6">
+  <div class="mb-2 flex items-baseline justify-between">
+    <h2 class="font-semibold">
+      {{ group.label }}
+      {% if group.is_mine %}<span class="ml-1 text-xs font-normal text-stone-500">(votre session)</span>{% endif %}
+    </h2>
+    <p class="text-xs text-stone-500">{{ group.rows|length }} compte{{ group.rows|length|pluralize }}</p>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for item in group.rows %}
+    <a href="{% url 'budget:account_detail' item.account.pk %}" class="card block hover:border-emerald-300">
+      <div class="flex items-center justify-between">
+        <span class="font-semibold">{{ item.account.name }}</span>
+        <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+          {{ item.account.get_type_display }}
+        </span>
+      </div>
+      {% if item.account.institution %}
+      <p class="mt-1 text-xs text-stone-500">{{ item.account.institution }}</p>
+      {% endif %}
+      <p class="mt-3 text-xl font-semibold {% if item.current_balance < 0 %}text-red-600{% endif %}">
+        {{ item.current_balance|floatformat:2 }} {{ item.account.currency_id }}
+      </p>
+      {% if item.movement %}
+      <p class="mt-1 text-xs {% if item.goes_negative %}font-semibold text-red-600{% else %}text-stone-500{% endif %}">
+        → {{ item.projected_balance|floatformat:2 }} fin de mois
+        {% if item.goes_negative %} (à découvert){% endif %}
+      </p>
+      {% endif %}
+    </a>
+    {% empty %}
+    <p class="text-sm text-stone-500">Aucun compte dans ce périmètre.</p>
+    {% endfor %}
+  </div>
+</section>
+{% empty %}
+<p class="text-sm text-stone-500">Aucun compte pour l'instant.</p>
+{% endfor %}
 {% endblock %}

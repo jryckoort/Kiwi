@@ -5,8 +5,13 @@ from apps.accounts.decorators import household_required
 from apps.budget.models import FinancialAccount
 
 from .forms import LiabilityForm, RealAssetForm, SecurityTransactionForm
-from .models import Liability, RealAsset, Security
-from .services import compute_holdings, compute_net_worth, is_stale, latest_quote
+from .models import Security
+from .services import (
+    compute_holdings,
+    compute_net_worth_by_owner,
+    is_stale,
+    latest_quote,
+)
 
 
 @household_required
@@ -39,9 +44,9 @@ def overview(request):
         if rows:
             holdings_by_account.append({"account": account, "rows": rows})
 
-    real_assets = RealAsset.objects.for_household(request.household).select_related("owner")
-    liabilities = Liability.objects.for_household(request.household).select_related("owner")
-    total_assets, total_liabilities, net_worth, breakdown = compute_net_worth(request.household)
+    # Same items as the family total, sliced per member — the consolidated
+    # figure and the per-person ones can never disagree.
+    by_owner = compute_net_worth_by_owner(request.household, viewer=request.user)
 
     # Nobody self-hosting reads Celery logs, so a broken price feed has to be
     # visible on the page that depends on it.
@@ -54,13 +59,12 @@ def overview(request):
 
     context = {
         "holdings_by_account": holdings_by_account,
-        "real_assets": real_assets,
-        "liabilities": liabilities,
-        "total_assets": total_assets,
-        "total_liabilities": total_liabilities,
-        "net_worth": net_worth,
-        "base_currency": request.household.base_currency,
-        "valuation_warnings": breakdown.get("warnings", []),
+        "groups": by_owner["groups"],
+        "total_assets": by_owner["total_assets"],
+        "total_liabilities": by_owner["total_liabilities"],
+        "net_worth": by_owner["net_worth"],
+        "base_currency": by_owner["base_currency"],
+        "valuation_warnings": by_owner["warnings"],
         "price_feed_errors": price_feed_errors,
     }
     return render(request, "wealth/overview.html", context)

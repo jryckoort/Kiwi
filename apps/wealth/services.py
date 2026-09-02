@@ -106,37 +106,52 @@ def _consume_fifo(lots, quantity):
     return cost_removed
 
 
-def compute_net_worth(household):
-    """Net worth in the household's base currency.
+@dataclass
+class NetWorthItem:
+    """One line of net worth, already converted to the household's base currency.
 
-    Covers cash accounts, the market value of security holdings, real assets
-    and liabilities. Amounts held in another currency are converted through
-    the fx app; anything that could not be converted is listed in
-    ``breakdown["warnings"]``.
+    ``owner`` is who it belongs to (None = commun). A security holding is
+    attributed through the account it sits in — the same rule budgets use for
+    actuals, so the two views never disagree about whose money is whose.
+    """
+
+    owner: object  # User, or None for commun
+    kind: str  # account | security | real_asset | liability
+    label: str
+    value: Decimal  # positive magnitude; liabilities are flagged, not negated
+
+    @property
+    def is_liability(self):
+        return self.kind == "liability"
+
+
+def collect_net_worth_items(household):
+    """Every net worth line for a household, plus the warnings raised on the way.
+
+    Both the flat total and the per-owner breakdown are built from this, so
+    they can never drift apart.
     """
     from django.db.models import Sum
 
     from apps.budget.models import FinancialAccount
 
     base_currency = household.base_currency
-    total_assets = Decimal(0)
     warnings = []
-    breakdown = {
-        "accounts": {},
-        "securities": {},
-        "real_assets": {},
-        "liabilities": {},
-        "warnings": warnings,
-    }
+    items = []
 
-    accounts = FinancialAccount.objects.for_household(household).filter(is_archived=False)
+    accounts = (
+        FinancialAccount.objects.for_household(household)
+        .filter(is_archived=False)
+        .select_related("owner", "currency")
+    )
     for account in accounts:
         balance = account.transactions.aggregate(total=Sum("amount"))["total"] or Decimal(0)
         balance = to_base_currency(
             balance, account.currency_id, base_currency, account.name, warnings
         )
-        total_assets += balance
-        breakdown["accounts"][account.name] = str(balance)
+        items.append(
+            NetWorthItem(owner=account.owner, kind="account", label=account.name, value=balance)
+        )
 
         for holding in compute_holdings(account):
             security = Security.objects.get(pk=holding.security_id)
@@ -155,18 +170,24 @@ def compute_net_worth(household):
             value = to_base_currency(
                 value, security.currency_id, base_currency, security.name, warnings
             )
-            total_assets += value
-            breakdown["securities"][f"{account.name} · {security.name}"] = str(value)
+            items.append(
+                NetWorthItem(
+                    owner=account.owner,
+                    kind="security",
+                    label=f"{account.name} · {security.name}",
+                    value=value,
+                )
+            )
 
-    for asset in RealAsset.objects.for_household(household):
+    for asset in RealAsset.objects.for_household(household).select_related("owner"):
         value = to_base_currency(
             asset.current_value, asset.currency_id, base_currency, asset.name, warnings
         )
-        total_assets += value
-        breakdown["real_assets"][asset.name] = str(value)
+        items.append(
+            NetWorthItem(owner=asset.owner, kind="real_asset", label=asset.name, value=value)
+        )
 
-    total_liabilities = Decimal(0)
-    for liability in Liability.objects.for_household(household):
+    for liability in Liability.objects.for_household(household).select_related("owner"):
         value = to_base_currency(
             liability.remaining_balance,
             liability.currency_id,
@@ -174,8 +195,103 @@ def compute_net_worth(household):
             liability.name,
             warnings,
         )
-        total_liabilities += value
-        breakdown["liabilities"][liability.name] = str(value)
+        items.append(
+            NetWorthItem(
+                owner=liability.owner, kind="liability", label=liability.name, value=value
+            )
+        )
+
+    return items, list(dict.fromkeys(warnings))
+
+
+@dataclass
+class OwnerNetWorth:
+    """One perimeter's slice of the household net worth."""
+
+    perimeter: object  # accounts.perimeters.Perimeter
+
+    @property
+    def label(self):
+        return self.perimeter.label
+
+    @property
+    def is_mine(self):
+        return self.perimeter.is_mine
+
+    @property
+    def is_commun(self):
+        return self.perimeter.is_commun
+
+    @property
+    def assets(self):
+        return sum((i.value for i in self.perimeter.rows if not i.is_liability), Decimal(0))
+
+    @property
+    def liabilities(self):
+        return sum((i.value for i in self.perimeter.rows if i.is_liability), Decimal(0))
+
+    @property
+    def net_worth(self):
+        return self.assets - self.liabilities
+
+    def rows_of_kind(self, kind):
+        return [i for i in self.perimeter.rows if i.kind == kind]
+
+
+def compute_net_worth_by_owner(household, viewer=None):
+    """Net worth split per member and commun, ordered from the viewer outwards.
+
+    The family total is the sum of the groups — the consolidated view and the
+    per-person views are the same numbers, sliced differently.
+    """
+    from apps.accounts.perimeters import group_by_owner
+
+    items, warnings = collect_net_worth_items(household)
+    perimeters = group_by_owner(
+        items,
+        viewer,
+        owner_of=lambda item: item.owner,
+        include_owners=household.members.all(),
+        include_commun=True,
+    )
+    groups = [OwnerNetWorth(perimeter=perimeter) for perimeter in perimeters]
+
+    return {
+        "groups": groups,
+        "total_assets": sum((g.assets for g in groups), Decimal(0)),
+        "total_liabilities": sum((g.liabilities for g in groups), Decimal(0)),
+        "net_worth": sum((g.net_worth for g in groups), Decimal(0)),
+        "base_currency": household.base_currency,
+        "warnings": warnings,
+    }
+
+
+def compute_net_worth(household):
+    """Flat household net worth in the base currency.
+
+    Kept as the simple entry point used by the dashboard and the monthly
+    snapshot; ``compute_net_worth_by_owner`` slices the same items per member.
+    """
+    items, warnings = collect_net_worth_items(household)
+
+    total_assets = sum((i.value for i in items if not i.is_liability), Decimal(0))
+    total_liabilities = sum((i.value for i in items if i.is_liability), Decimal(0))
+
+    breakdown = {
+        "accounts": {},
+        "securities": {},
+        "real_assets": {},
+        "liabilities": {},
+        "warnings": warnings,
+    }
+    section = {
+        "account": "accounts",
+        "security": "securities",
+        "real_asset": "real_assets",
+        "liability": "liabilities",
+    }
+    for item in items:
+        breakdown[section[item.kind]][item.label] = str(item.value)
 
     net_worth = total_assets - total_liabilities
     return total_assets, total_liabilities, net_worth, breakdown

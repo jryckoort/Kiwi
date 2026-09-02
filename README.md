@@ -122,6 +122,28 @@ solde (importées ou saisies), les reprojeter les compterait deux fois. La
 projection suppose donc vos imports bancaires à jour. Un compte qui passe
 sous zéro d'ici la fin du mois est signalé en rouge.
 
+## Périmètres : moi, le commun, et l'autre membre
+
+Comptes, budgets et patrimoine sont regroupés par **périmètre**, dans le même
+ordre partout, depuis votre session vers l'extérieur :
+
+```
+Moi  →  Commun au foyer  →  chaque autre membre
+```
+
+La même donnée se lit donc différemment selon la session : ce que Julien voit
+comme « Moi », Marie le voit comme « Julien », et réciproquement. Seuls
+l'étiquetage et l'ordre changent.
+
+**Rien n'est masqué** : le foyer reste le périmètre de confiance, chaque membre
+voit tout. `owner` dit à qui une chose appartient, pas qui a le droit de la
+voir. Un compte perso sert à attribuer les dépenses au bon budget, pas à les
+cacher au conjoint.
+
+La page Patrimoine affiche le total **famille** consolidé, puis le détail par
+périmètre. Les deux viennent des mêmes lignes : le consolidé est exactement la
+somme des périmètres, jamais un calcul parallèle qui pourrait diverger.
+
 ## Calcul du patrimoine net
 
 Le patrimoine net additionne les soldes des comptes, la valeur de marché des

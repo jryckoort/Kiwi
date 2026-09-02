@@ -217,7 +217,10 @@ def test_projection_appears_on_the_account_list_page(client, household, account)
     body = response.content.decode()
 
     assert response.status_code == 200
-    assert "Solde projeté" in body
+    # Assert the figures rather than the wording, so relabelling the page
+    # doesn't break the test: 1000 today, 300 of rent still to come.
+    assert "1000,00" in body
+    assert "700,00" in body
     assert "None" not in body
 
 
