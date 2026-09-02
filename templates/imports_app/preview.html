@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Prévisualisation de l'import{% endblock %}
+{% block page_title %}Prévisualisation — {{ batch.account.name }}{% endblock %}
+{% block content %}
+<div class="mb-4 flex gap-4 text-sm">
+  <span class="rounded-full bg-stone-100 px-3 py-1">{{ rows|length }} lignes</span>
+  {% if duplicate_count %}<span class="rounded-full bg-amber-100 px-3 py-1 text-amber-800">{{ duplicate_count }} doublons (ignorés)</span>{% endif %}
+  {% if error_count %}<span class="rounded-full bg-red-100 px-3 py-1 text-red-800">{{ error_count }} erreurs (ignorées)</span>{% endif %}
+</div>
+
+<div class="card mb-4 overflow-x-auto p-0">
+  <table class="w-full text-sm">
+    <thead class="text-left text-xs uppercase text-stone-500">
+      <tr>
+        <th class="px-4 py-2">Ligne</th>
+        <th class="px-4 py-2">Date</th>
+        <th class="px-4 py-2">Description</th>
+        <th class="px-4 py-2 text-right">Montant</th>
+        <th class="px-4 py-2">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="border-t border-stone-100 {% if row.error %}bg-red-50{% elif row.is_duplicate %}bg-amber-50{% endif %}">
+        <td class="px-4 py-2">{{ row.line }}</td>
+        {% if row.error %}
+        <td class="px-4 py-2 text-red-700" colspan="3">{{ row.error }}</td>
+        {% else %}
+        <td class="px-4 py-2">{{ row.date }}</td>
+        <td class="px-4 py-2">{{ row.description|default:row.counterparty }}</td>
+        <td class="px-4 py-2 text-right">{{ row.amount }}</td>
+        {% endif %}
+        <td class="px-4 py-2 text-xs">
+          {% if row.error %}Erreur{% elif row.is_duplicate %}Doublon{% else %}À importer{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn-primary">Confirmer l'import</button>
+</form>
+{% endblock %}

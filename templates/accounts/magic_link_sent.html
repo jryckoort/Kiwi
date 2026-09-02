@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Email envoyé{% endblock %}
+{% block guest_content %}
+<div class="card w-full max-w-sm text-center">
+  <div class="mb-6 text-2xl font-semibold text-emerald-700">🥝 Kiwi</div>
+  <p class="text-sm text-stone-700">
+    Si cette adresse correspond à un compte, un lien de connexion vient d'être envoyé.
+    Vérifiez votre boîte mail (et vos spams) — le lien est valable 15 minutes.
+  </p>
+  <a href="{% url 'accounts:login' %}" class="mt-6 inline-block text-sm text-emerald-700 underline">
+    Retour à la connexion
+  </a>
+</div>
+{% endblock %}

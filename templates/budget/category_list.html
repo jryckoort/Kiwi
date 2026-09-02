@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Catégories{% endblock %}
+{% block page_title %}Catégories{% endblock %}
+{% block content %}
+<div class="grid gap-6 md:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Catégories existantes</h2>
+    <ul class="space-y-2 text-sm">
+      {% for category in categories %}
+      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
+        <span class="flex items-center gap-2">
+          <span class="h-2.5 w-2.5 rounded-full" style="background-color:{{ category.color }}"></span>
+          {{ category.name }}
+        </span>
+        <span class="text-xs text-stone-500">{{ category.get_kind_display }}</span>
+      </li>
+      {% empty %}
+      <li class="text-stone-500">Aucune catégorie pour l'instant.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Nouvelle catégorie</h2>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {% for field in form %}
+      <div>
+        <label class="mb-1 block text-sm font-medium text-stone-700">{{ field.label }}</label>
+        {{ field }}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn-primary w-full">Ajouter</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

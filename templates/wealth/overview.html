@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Patrimoine{% endblock %}
+{% block page_title %}Patrimoine{% endblock %}
+{% block content %}
+<div class="mb-6 grid gap-4 sm:grid-cols-3">
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Actifs</p>
+    <p class="mt-1 text-2xl font-semibold">{{ total_assets|floatformat:2 }} {{ base_currency }}</p>
+  </div>
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Dettes</p>
+    <p class="mt-1 text-2xl font-semibold text-red-600">{{ total_liabilities|floatformat:2 }} {{ base_currency }}</p>
+  </div>
+  <div class="card">
+    <p class="text-xs uppercase text-stone-500">Patrimoine net</p>
+    <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ net_worth|floatformat:2 }} {{ base_currency }}</p>
+  </div>
+</div>
+
+{% if price_feed_errors %}
+<div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+  <p class="font-semibold">Récupération automatique des cours en échec :</p>
+  <ul class="mt-1 list-inside list-disc">
+    {% for security in price_feed_errors %}
+    <li>{{ security.name }} ({{ security.price_symbol|default:"sans symbole" }}) — {{ security.last_sync_error }}</li>
+    {% endfor %}
+  </ul>
+  <p class="mt-2 text-xs">Les valorisations ci-dessous utilisent le dernier cours connu.</p>
+</div>
+{% endif %}
+
+{% if valuation_warnings %}
+<div class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+  <p class="font-semibold">Valorisation approximative :</p>
+  <ul class="mt-1 list-inside list-disc">
+    {% for warning in valuation_warnings %}<li>{{ warning }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="mb-4 flex justify-end gap-2">
+  <a href="{% url 'wealth:security_transaction_create' %}" class="btn-secondary">+ Opération titres</a>
+  <a href="{% url 'wealth:real_asset_create' %}" class="btn-secondary">+ Actif réel</a>
+  <a href="{% url 'wealth:liability_create' %}" class="btn-secondary">+ Dette</a>
+</div>
+
+<h2 class="mb-2 font-semibold">Portefeuille titres</h2>
+{% for group in holdings_by_account %}
+<div class="card mb-4 overflow-x-auto p-0">
+  <p class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium">{{ group.account.name }}</p>
+  <table class="w-full text-sm">
+    <thead class="text-left text-xs uppercase text-stone-500">
+      <tr>
+        <th class="px-4 py-2">Titre</th>
+        <th class="px-4 py-2 text-right">Quantité</th>
+        <th class="px-4 py-2 text-right">PRU</th>
+        <th class="px-4 py-2 text-right">Cours</th>
+        <th class="px-4 py-2 text-right">Valeur</th>
+        <th class="px-4 py-2 text-right">+/- value latente</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in group.rows %}
+      <tr class="border-t border-stone-100">
+        <td class="px-4 py-2">{{ row.security.name }}</td>
+        <td class="px-4 py-2 text-right">{{ row.quantity|floatformat:"-4" }}</td>
+        <td class="px-4 py-2 text-right">{{ row.average_cost|floatformat:2 }}</td>
+        <td class="px-4 py-2 text-right">
+          {% if row.price is None %}—{% else %}
+          {{ row.price|floatformat:2 }}
+          {% if row.quote_date %}
+          <span class="block text-xs {% if row.is_stale %}font-medium text-amber-600{% else %}text-stone-400{% endif %}">
+            {{ row.quote_date|date:"d/m/Y" }}{% if row.is_stale %} ⚠{% endif %}
+          </span>
+          {% endif %}
+          {% endif %}
+        </td>
+        <td class="px-4 py-2 text-right">{% if row.market_value is None %}—{% else %}{{ row.market_value|floatformat:2 }}{% endif %}</td>
+        <td class="px-4 py-2 text-right {% if row.unrealized_gain and row.unrealized_gain < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">
+          {% if row.unrealized_gain is None %}—{% else %}{{ row.unrealized_gain|floatformat:2 }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% empty %}
+<p class="mb-6 text-sm text-stone-500">Aucune position en portefeuille pour l'instant.</p>
+{% endfor %}
+
+<div class="grid gap-6 md:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Actifs réels</h2>
+    <ul class="space-y-2 text-sm">
+      {% for asset in real_assets %}
+      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
+        <span>{{ asset.name }} <span class="text-xs text-stone-500">({{ asset.get_type_display }})</span></span>
+        <span class="font-medium">{{ asset.current_value }} {{ asset.currency_id }}</span>
+      </li>
+      {% empty %}
+      <li class="text-stone-500">Aucun actif réel.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h2 class="mb-4 font-semibold">Dettes</h2>
+    <ul class="space-y-2 text-sm">
+      {% for liability in liabilities %}
+      <li class="flex items-center justify-between border-b border-stone-100 pb-2">
+        <span>{{ liability.name }} <span class="text-xs text-stone-500">({{ liability.get_type_display }})</span></span>
+        <span class="font-medium text-red-600">{{ liability.remaining_balance }} {{ liability.currency_id }}</span>
+      </li>
+      {% empty %}
+      <li class="text-stone-500">Aucune dette.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
